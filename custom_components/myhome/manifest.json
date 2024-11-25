@@ -6,9 +6,7 @@
   "config_flow": true,
   "documentation": "https://github.com/michnovka/HomeAssistant-MyHOME",
   "issue_tracker": "https://github.com/michnovka/HomeAssistant-MyHOME/issues",
-  "requirements": [
-    "git+https://github.com/gdluck/OWNd.git@master"
-  ],
+  "requirements": ["git+https://github.com/issacg/pycoolmaster.git@except_connect"],
   "ssdp": [
     {
       "st": "upnp:rootdevice",
