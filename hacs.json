@@ -1,6 +1,6 @@
 {
   "name": "MyHome",
-  "zip_release": true,
+  "zip_release": false,
   "filename": "myhome.zip",
   "render_readme": true,
   "country": [
