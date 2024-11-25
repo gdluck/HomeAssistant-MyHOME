@@ -7,7 +7,7 @@
   "documentation": "https://github.com/michnovka/HomeAssistant-MyHOME",
   "issue_tracker": "https://github.com/michnovka/HomeAssistant-MyHOME/issues",
   "requirements": [
-    "git+https://github.com/gdluck/OWNd.git@master#egg=OWNd"
+    "git+https://github.com/gdluck/OWNd.git@master"
   ],
   "ssdp": [
     {
