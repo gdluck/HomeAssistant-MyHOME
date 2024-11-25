@@ -4,10 +4,10 @@
   "name": "MyHOME",
   "version": "0.9.4-michnovka",
   "config_flow": true,
-  "documentation": "https://github.com/anotherjulien/MyHOME",
-  "issue_tracker": "https://github.com/anotherjulien/MyHOME/issues",
+  "documentation": "https://github.com/michnovka/HomeAssistant-MyHOME",
+  "issue_tracker": "https://github.com/michnovka/HomeAssistant-MyHOME/issues",
   "requirements": [
-    "OWNd==0.7.48"
+    "git+https://github.com/gdluck/OWNd.git@master"
   ],
   "ssdp": [
     {
