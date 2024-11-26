@@ -420,6 +420,7 @@ class MyHOMEGatewayHandler:
         await _command_session.connect()
         await _command_session.send(message)
         await _command_session.close()
+        LOGGER.debug("Miauuu %s", message)
 #        await self.send_buffer.put({"message": message, "is_status_request": False})
 #        LOGGER.debug(
 #            "%s Message `%s` was successfully queued.",
