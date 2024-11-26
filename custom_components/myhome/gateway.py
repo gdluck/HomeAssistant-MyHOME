@@ -416,12 +416,16 @@ class MyHOMEGatewayHandler:
         return True
 
     async def send(self, message: OWNCommand):
-        await self.send_buffer.put({"message": message, "is_status_request": False})
-        LOGGER.debug(
-            "%s Message `%s` was successfully queued.",
-            self.log_id,
-            message,
-        )
+        _command_session = OWNCommandSession(gateway=self.gateway, logger=LOGGER)
+        await _command_session.connect()
+        await _command_session.send(message)
+        await _command_session.close()
+#        await self.send_buffer.put({"message": message, "is_status_request": False})
+#        LOGGER.debug(
+#            "%s Message `%s` was successfully queued.",
+#            self.log_id,
+#            message,
+#        )
 
     async def send_status_request(self, message: OWNCommand):
         await self.send_buffer.put({"message": message, "is_status_request": True})
