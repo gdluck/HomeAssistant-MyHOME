@@ -1,4 +1,4 @@
-"""Code to handle a MyHome Gateway."""
+"""Code to handle a MyHome Gateway"""
 import asyncio
 from typing import Dict, List
 
