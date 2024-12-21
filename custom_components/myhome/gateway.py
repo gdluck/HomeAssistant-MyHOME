@@ -406,7 +406,9 @@ class MyHOMEGatewayHandler:
             self.log_id,
             worker_id,
         )
-        self.sending_workers[worker_id].cancel()
+        # Fix Asyncio Task was destroyed but it was pending
+        # self.sending_workers[worker_id].cancel()
+        await self.sending_workers[worker_id]
 
     async def close_listener(self) -> bool:
         LOGGER.info("%s Closing event listener", self.log_id)
