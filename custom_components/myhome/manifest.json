@@ -6,7 +6,7 @@
   "config_flow": true,
   "documentation": "https://github.com/michnovka/HomeAssistant-MyHOME",
   "issue_tracker": "https://github.com/michnovka/HomeAssistant-MyHOME/issues",
-  "requirements": ["OWNd @ git+https://github.com/gdluck/OWNd.git@master#v=2"],
+  "requirements": ["OWNd @ git+https://github.com/gdluck/OWNd.git@master#v=3"],
   "loggers": ["custom_components.myhome"],
   "ssdp": [
     {
@@ -69,5 +69,6 @@
     "@anotherjulien"
   ]
 }
+
 
 
