@@ -71,8 +71,35 @@ def test_run_mypy_parses_error_lines(baseline):
 
     class Proc:
         stdout = fake
+        stderr = ""
+        returncode = 1
 
     with patch.object(typing_ratchet.subprocess, "run", return_value=Proc()):
         counts, output = typing_ratchet.run_mypy()
     assert counts == _counts(light=1, cover=1)
     assert output == fake
+
+
+def test_run_mypy_fails_loudly_when_mypy_did_not_run(monkeypatch):
+    """A missing or crashing mypy must not read as "0 errors" (exit 2 = did not run)."""
+    from types import SimpleNamespace
+
+    def fake_run(*args, **kwargs):
+        return SimpleNamespace(returncode=2, stdout="", stderr="No module named mypy")
+
+    monkeypatch.setattr(typing_ratchet.subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match="did not run"):
+        typing_ratchet.run_mypy()
+
+
+def test_run_mypy_fails_when_errors_cannot_be_parsed(monkeypatch):
+    """Exit 1 with no parsable error line means the output format changed, not a clean run."""
+    from types import SimpleNamespace
+
+    def fake_run(*args, **kwargs):
+        return SimpleNamespace(returncode=1, stdout="something unexpected", stderr="")
+
+    monkeypatch.setattr(typing_ratchet.subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match="could not be parsed"):
+        typing_ratchet.run_mypy()
+

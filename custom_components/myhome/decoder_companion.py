@@ -49,7 +49,8 @@ def async_find_streaming_companion(hass: HomeAssistant, entity_id: str) -> str |
     device = dev_reg.async_get(entry.device_id) if entry.device_id else None
 
     # 2. Check devices sharing the same MAC address (if not merged by device registry)
-    if device is not None:
+    # A child device entry (core 2026.9+) has no connections of its own.
+    if isinstance(device, dr.DeviceEntry):
         macs = {conn[1] for conn in device.connections if conn[0] == dr.CONNECTION_NETWORK_MAC}
         if macs:
             all_devices = dev_reg.devices.values() if hasattr(dev_reg.devices, "values") else dev_reg.devices

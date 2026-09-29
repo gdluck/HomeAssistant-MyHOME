@@ -385,9 +385,9 @@ class MyHOMEClimate(MyHOMEEntity, ClimateEntity):
         else:
             await self._gateway_handler.send_status_request(OWNHeatingCommand.status(self._full_where))
             if self._fan:
-                await self._gateway_handler.send_status_request(
-                    OWNHeatingCommand.parse(f"*#4*{self._full_where}*11##")
-                )
+                fan_status = OWNHeatingCommand.parse(f"*#4*{self._full_where}*11##")
+                if fan_status is not None:
+                    await self._gateway_handler.send_status_request(fan_status)
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added to hass."""

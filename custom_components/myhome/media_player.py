@@ -962,7 +962,7 @@ class MyHOMEMediaPlayer(MyHOMEEntity, MediaPlayerEntity):
         """
         pool = self._get_pool()
         group = self._group_entities(pool) if pool and pool.is_configured else []
-        if group:
+        if group and pool is not None:
             self._begin_wake_of_parked_group(pool)
         try:
             await self._async_play_media(media_type, media_id, **kwargs)
@@ -1103,7 +1103,7 @@ class MyHOMEMediaPlayer(MyHOMEEntity, MediaPlayerEntity):
         await self._async_wake_zone()
         self.async_write_ha_state()
         sent: set[str] = set()
-        if route:
+        if route and source_num is not None:
             await self._route_to(source_num, sent)
 
         # If this zone is a group leader, wake and route the members too. The
@@ -1687,7 +1687,7 @@ class MyHOMEMediaPlayer(MyHOMEEntity, MediaPlayerEntity):
         route = self._routing_configured() and source_num is not None
         sent: set[str] = set()
         await self._async_wake_zone()
-        if route:
+        if route and source_num is not None:
             await self._route_to(source_num, sent)
         self.async_write_ha_state()
         members = self._group_entities(pool)[1:]
