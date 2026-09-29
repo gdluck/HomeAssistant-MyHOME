@@ -386,7 +386,10 @@ class MyHOMEGatewayHandler:
     @property
     def firmware(self) -> str | None:
         """Return gateway firmware version."""
-        return self.gateway.firmware
+        # Annotated on purpose: CI's strict-typing job runs without OWNd installed,
+        # where the attribute is `Any` and a bare return trips no-any-return.
+        firmware: str | None = self.gateway.firmware
+        return firmware
 
     @property
     def profile(self) -> Any:
