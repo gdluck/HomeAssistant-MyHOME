@@ -569,3 +569,26 @@ class TestButtonEntity:
         await enable_button.async_press()
         enable_button._gateway_handler.send.assert_called_once()
         assert "*14*1*24#4#b##" in str(enable_button._gateway_handler.send.call_args[0][0])
+
+
+class TestSwitchDimensionFrames:
+    def test_dimension_only_frame_keeps_the_switch_state(self, mock_hass, mock_gateway, mock_entity_base_init):
+        """A timer status reply (dimension 2) carries no on/off: the state must not become unknown."""
+        from custom_components.myhome.switch import MyHOMESwitch
+
+        s = MyHOMESwitch(
+            hass=mock_hass, name="Switch 1", entity_name="Switch 1", device_id="1#22", who="1", where="22",
+            interface="s", device_class="switch", icon="mdi:flash", icon_on="mdi:flash",
+            manufacturer="BTicino", model="Relay", gateway=mock_gateway,
+        )
+        s.hass = mock_hass
+        s.entity_id = "switch.s"
+        s.platform = MagicMock()
+        s.async_schedule_update_ha_state = MagicMock()
+
+        s.handle_event(OWNEvent.parse("*1*1*22##"))
+        assert s._attr_is_on is True
+        timer_status = OWNEvent.parse("*#1*22*2*0*0*30##")
+        assert timer_status.is_on is None
+        s.handle_event(timer_status)
+        assert s._attr_is_on is True

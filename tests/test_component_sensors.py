@@ -425,3 +425,31 @@ class TestBinarySensorsCoverage:
         msg.human_readable_log = "m"
         sensor.handle_event(msg)
         assert sensor._attr_is_on is True
+
+
+class TestSignedTemperatures:
+    """WHO 4 dimension 0 carries a sign digit OWNd 2.0.0b8 ignores: 1035 is -3.5 °C."""
+
+    def _sensor(self, mock_hass, mock_gateway, where):
+        sensor = MyHOMETemperatureSensor(
+            hass=mock_hass, name="Probe", device_id=f"4-{where}", who="4", where=where,
+            device_class="temperature", manufacturer="Bticino", model="Probe", gateway=mock_gateway,
+        )
+        sensor.async_schedule_update_ha_state = MagicMock()
+        return sensor
+
+    def test_negative_zone_temperature(self, mock_hass, mock_gateway):
+        from OWNd.message import OWNMessage
+
+        sensor = self._sensor(mock_hass, mock_gateway, "1")
+        sensor.handle_event(OWNMessage.parse("*#4*1*0*1035*3##"))
+        assert sensor._attr_native_value == -3.5
+        sensor.handle_event(OWNMessage.parse("*#4*1*0*0215*3##"))
+        assert sensor._attr_native_value == 21.5
+
+    def test_negative_probe_temperature(self, mock_hass, mock_gateway):
+        from OWNd.message import OWNMessage
+
+        sensor = self._sensor(mock_hass, mock_gateway, "105")
+        sensor.handle_event(OWNMessage.parse("*#4*105*0*1035*3##"))
+        assert sensor._attr_native_value == -3.5

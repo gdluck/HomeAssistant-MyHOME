@@ -1980,3 +1980,40 @@ async def test_options_flow_update_delegated_whos_self_skip(hass: HomeAssistant)
         )
         assert result["type"] == FlowResultType.CREATE_ENTRY
 
+
+
+async def test_ssdp_rediscovery_only_refreshes_the_address(hass: HomeAssistant) -> None:
+    """SSDP never learns the port or the user's model choice: rewriting them undid a reconfigure on every restart."""
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"host": "192.0.2.10", "port": 20001, "mac": "00:03:50:00:12:34", "name": "MH202", "model_source": "manual"},
+        unique_id="00:03:50:00:12:34",
+    )
+    entry.add_to_hass(hass)
+
+    class SsdpServiceInfo:
+        def __init__(self, ssdp_usn, ssdp_st, ssdp_location, upnp, ssdp_headers):
+            self.ssdp_usn = ssdp_usn
+            self.ssdp_st = ssdp_st
+            self.ssdp_location = ssdp_location
+            self.upnp = upnp
+            self.ssdp_headers = ssdp_headers
+
+    ssdp_info = SsdpServiceInfo(
+        ssdp_usn="mock_usn",
+        ssdp_st="mock_st",
+        ssdp_location="http://192.0.2.11:49153/description.xml",
+        upnp={"modelName": "F454", "serialNumber": "00:03:50:00:12:34", "friendlyName": "Gateway", "UDN": "uuid", "modelNumber": "2.0"},
+        ssdp_headers={"_host": "192.0.2.11"},
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_SSDP}, data=ssdp_info
+    )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert entry.data["host"] == "192.0.2.11"
+    assert entry.data["port"] == 20001
+    assert entry.data["name"] == "MH202"

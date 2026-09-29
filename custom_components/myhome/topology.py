@@ -424,6 +424,7 @@ def async_check_primary_links(hass: HomeAssistant, *, removed: str | None = None
 
     for entry in hass.config_entries.async_entries(DOMAIN):
         if entry.entry_id == removed:
+            async_delete_primary_missing_issue(hass, entry.entry_id)
             continue
         primary = entry_primary_mac(entry)
         target = entry_for_mac(hass, primary, exclude=removed) if primary else None

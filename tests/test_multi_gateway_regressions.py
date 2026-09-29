@@ -444,3 +444,13 @@ def test_primary_links_skip_the_entry_being_removed(hass: HomeAssistant) -> None
     assert _issue(hass, f"{ISSUE_PRIMARY_GATEWAY_MISSING}_{entry_s.entry_id}") is None
     async_check_primary_links(hass)  # its primary does not exist
     assert _issue(hass, f"{ISSUE_PRIMARY_GATEWAY_MISSING}_{entry_s.entry_id}") is not None
+
+
+def test_removing_a_follower_deletes_its_own_primary_missing_issue(hass: HomeAssistant) -> None:
+    entry_s, _ = _create_mock_gateway(hass, SB, topology=TOPOLOGY_SHARED, role=ROLE_STANDBY, primary_gateway=PRI)
+    async_check_primary_links(hass)  # its primary does not exist
+    assert _issue(hass, f"{ISSUE_PRIMARY_GATEWAY_MISSING}_{entry_s.entry_id}") is not None
+
+    async_check_primary_links(hass, removed=entry_s.entry_id)
+
+    assert _issue(hass, f"{ISSUE_PRIMARY_GATEWAY_MISSING}_{entry_s.entry_id}") is None

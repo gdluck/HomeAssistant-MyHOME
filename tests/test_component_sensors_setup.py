@@ -300,6 +300,8 @@ async def test_async_setup_entry_illuminance_registry_and_discovery(hass, mock_c
         assert [type(e).__name__ for e in added[:2]] == ["MyHOMEPowerSensor", "MyHOMEEnergySensor"]
         assert isinstance(added[2], MyHOMEIlluminanceSensor)
         assert added[2]._where == "14"
+        # restored under the registry's own unique id (`{mac}-1-14-...`), not a rebuilt one
+        assert added[2]._attr_unique_id == entry_illum_disc.unique_id
         assert isinstance(added[3], MyHOMEIlluminanceSensor)
         assert added[3]._where == "12"
         mock_registry.async_remove.assert_called_once_with(entry_illum.entity_id)

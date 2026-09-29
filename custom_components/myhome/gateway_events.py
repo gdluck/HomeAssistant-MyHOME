@@ -45,6 +45,17 @@ if TYPE_CHECKING:
     from .gateway import MyHOMEGatewayHandler
 
 
+def _is_sensor_frame(message: Any) -> bool:
+    """Motion / illuminance / PIR frames on WHO 1 are not actuator status (mirrors light.py)."""
+    return (
+        getattr(message, "is_sensor", False) is True
+        or getattr(message, "motion", False) is True
+        or isinstance(getattr(message, "illuminance", None), int)
+        or getattr(message, "dimension", None) in (5, 6, 7)
+        or getattr(message, "_state", None) == 34
+    )
+
+
 class GatewayEventDispatcher:
     """Dispatches bus and integration events from gateway monitor frames."""
 
@@ -187,7 +198,13 @@ class GatewayEventDispatcher:
                         not getattr(message, "is_group", False)
                         and not getattr(message, "is_area", False)
                         and not getattr(message, "is_general", False)
+                        and message.is_on is not None
+                        and getattr(message, "dimension", None) is None
+                        and not _is_sensor_frame(message)
                     ):
+                        # Only an actuator's own on/off status counts as a member
+                        # echo; illuminance pushes and motion frames must not
+                        # cancel or suppress a resync sweep.
                         self.handler._resync_manager.handle_ptp_echo(message)
 
                     if message.is_on is not None:

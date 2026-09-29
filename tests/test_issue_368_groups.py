@@ -362,8 +362,10 @@ async def test_bus_frame_dimension_status(hass: HomeAssistant):
     group = _group(hass, gateway)
     await group.async_added_to_hass()
 
-    _fire(group, "*#1*#6*1*50*0##")
-    assert group.brightness == int(50 / 100 * 255)
+    # Dimension 1 is level + 100 on the bus: 150 means 50 %.
+    _fire(group, "*#1*#6*1*150*0##")
+    assert group.brightness == round(50 / 100 * 255)
+    assert group._last_brightness_pct == 50
 
     _fire(group, "*#1*#6*14*153##")
     assert group.color_temp_kelvin == int(1000000 / 153)
@@ -379,6 +381,23 @@ async def test_bus_frame_group_dimension_write_echo(hass: HomeAssistant):
     await group.async_added_to_hass()
 
     _fire(group, "*#1*#6*#14*153##")
+    assert group.color_temp_kelvin == int(1000000 / 153)
+
+    _fire(group, "*#1*#6*#1*175*0##")  # our own 75 % write, echoed raw
+    assert group.brightness == round(75 / 100 * 255)
+
+
+async def test_bus_frame_sentinels_ignored(hass: HomeAssistant):
+    """The DALI 'not supported' HSV sentinel and a 1-mired colour temperature carry no state."""
+    gateway = _gateway()
+    group = _group(hass, gateway)
+    await group.async_added_to_hass()
+
+    _fire(group, "*#1*#6*12*120*50*80##")
+    _fire(group, "*#1*#6*14*153##")
+    _fire(group, "*#1*#6*12*511*127*255##")
+    _fire(group, "*#1*#6*14*1##")
+    assert group.hs_color == (120.0, 50.0)
     assert group.color_temp_kelvin == int(1000000 / 153)
 
 

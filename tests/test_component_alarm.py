@@ -405,3 +405,22 @@ def test_alarm_states_are_the_core_enum():
     assert mod.STATE_TRIGGERED is AlarmControlPanelState.TRIGGERED
 
 
+
+
+async def test_alarm_arms_without_a_code_through_the_core_handlers(hass, mock_gateway):
+    """The central unit takes no code: the core arm handlers (services, alarm card) must not demand one."""
+    with patch("custom_components.myhome.myhome_device.Entity.__init__", return_value=None):
+        alarm = MyHOMEAlarmControlPanel(
+            hass=hass, name="Central", entity_name="Central", device_id="0", who="5", where="0",
+            manufacturer="BTicino", model="Burglar Alarm 3486", gateway=mock_gateway,
+        )
+    alarm.hass = hass
+    alarm.async_schedule_update_ha_state = MagicMock()
+    alarm.async_write_ha_state = MagicMock()
+
+    assert alarm.code_arm_required is False
+    assert alarm.code_format is None
+    alarm.check_code_arm_required(None)  # raises ServiceValidationError when a code is required
+
+    await alarm.async_handle_alarm_arm_away(None)
+    assert str(mock_gateway.send.call_args[0][0]) == "*5*1*0##"

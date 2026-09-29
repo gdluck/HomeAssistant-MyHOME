@@ -2138,3 +2138,49 @@ async def test_mh200_light_74_restored_on_after_the_fix(hass):
 
     assert light.is_on is None
     assert light.extra_state_attributes["unknown_state"] == 19
+
+
+def test_preset_level_from_a_wall_dimmer_sets_the_brightness(hass):
+    """WHAT 2..10 is "on at 20 %..100 %": the level itself, not only a hint that the light can dim."""
+    gateway = MagicMock()
+    gateway.send = AsyncMock()
+    light = MyHOMELight(
+        hass=hass, name="L", entity_name="L", icon=None, icon_on=None,
+        device_id="28", who="1", where="28", interface=None, dimmable=False,
+        manufacturer="B", model="M", gateway=gateway,
+    )
+    light.hass = hass
+    light.async_schedule_update_ha_state = MagicMock()
+
+    preset_event = MagicMock(spec=OWNLightingEvent)
+    preset_event.is_on = True
+    preset_event.brightness = None
+    preset_event.brightness_preset = 5
+    preset_event.human_readable_log = "Preset 5"
+    light.handle_event(preset_event)
+
+    assert light.color_mode == ColorMode.BRIGHTNESS
+    assert light._attr_brightness_pct == 50
+    assert light.brightness == round(50 * 255 / 100)
+    assert light._last_brightness_pct == 50
+
+
+async def test_brightness_one_is_on_at_minimum_not_off(hass):
+    """brightness: 1 (0 % after rounding) must dim to 1 %, not switch the light off."""
+    gateway = MagicMock()
+    gateway.send = AsyncMock()
+    light = MyHOMELight(
+        hass=hass, name="L", entity_name="L", icon=None, icon_on=None,
+        device_id="28", who="1", where="28", interface=None, dimmable=True,
+        manufacturer="B", model="M", gateway=gateway,
+    )
+    light.hass = hass
+    light.async_schedule_update_ha_state = MagicMock()
+    light._attr_is_on = True
+    light._attr_brightness_pct = 40
+
+    await light.async_turn_on(**{ATTR_BRIGHTNESS: 1})
+
+    frames = [str(call.args[0]) for call in gateway.send.call_args_list]
+    assert frames and "*1*0*28##" not in frames
+    assert light._attr_brightness_pct == 1

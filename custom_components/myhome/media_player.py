@@ -840,7 +840,9 @@ class MyHOMEMediaPlayer(MyHOMEEntity, MediaPlayerEntity):
         self._pending_off_task = None
         # A room that is already off (parked, say) needs no second OFF frame:
         # each one costs the single command session about 0.8 s.
-        already_off = self._attr_state == MediaPlayerState.OFF and not self._wake_pending
+        already_off = (
+            self._status_seen and self._attr_state == MediaPlayerState.OFF and not self._wake_pending
+        )
         await self._async_handle_turn_off(from_bus=already_off)
         self.async_write_ha_state()
 
@@ -1349,10 +1351,12 @@ class MyHOMEMediaPlayer(MyHOMEEntity, MediaPlayerEntity):
         route = self._routing_configured()
         for member_id in change.joined:
             member_ent = runtime.media_players[member_id]
-            if source_num is not None:
-                if route:
-                    await member_ent._route_to(source_num, coalesce=True)
-                await member_ent._async_wake_zone()
+            # Joining cancels a pending group-leave OFF and switches the amplifier
+            # on whatever the leader's source is; only the routing needs the source.
+            member_ent._cancel_pending_off()
+            if source_num is not None and route:
+                await member_ent._route_to(source_num, coalesce=True)
+            await member_ent._async_wake_zone()
             member_ent.async_write_ha_state()
 
         self.async_write_ha_state()
@@ -1387,6 +1391,8 @@ class MyHOMEMediaPlayer(MyHOMEEntity, MediaPlayerEntity):
                 self._turning_off = False
             self._attr_state = MediaPlayerState.OFF
             self._active_decoder = None
+            self._parked = False
+            self._wake_pending = False
             self.async_write_ha_state()
 
             # Update new leader and remaining members
@@ -1595,6 +1601,9 @@ class MyHOMEMediaPlayer(MyHOMEEntity, MediaPlayerEntity):
                             except Exception:
                                 pass
                             member_ent._attr_state = MediaPlayerState.OFF
+                            member_ent._parked = False  # the group is gone: no parked state to report
+                            member_ent._wake_pending = False
+                            member_ent._cancel_pending_off()
                             member_ent.async_write_ha_state()
                     await pool.release(self.entity_id)
                 else:
@@ -1815,9 +1824,11 @@ class MyHOMEMediaPlayer(MyHOMEEntity, MediaPlayerEntity):
             mute: ``True`` to mute, ``False`` to unmute.
         """
         if mute:
-            self._pre_mute_volume = (
-                self._attr_volume_level if self._attr_volume_level is not None else 0.5
-            )
+            # A repeated mute must not remember the 0.0 the first one produced.
+            if not self._attr_is_volume_muted and (self._attr_volume_level or 0.0) > 0.0:
+                self._pre_mute_volume = self._attr_volume_level
+            elif self._pre_mute_volume is None:
+                self._pre_mute_volume = 0.5
             await self.async_set_volume_level(0.0)
         else:
             restore_volume = self._pre_mute_volume if self._pre_mute_volume is not None else 0.3

@@ -60,6 +60,7 @@ from .const import (
     DOMAIN,
     LOGGER,
     normalize_where,
+    signed_who4_temperature,
 )
 from .data import MyHOMEConfigEntry
 from .discovery import Address, DeviceContext, PlatformDiscovery
@@ -274,6 +275,10 @@ async def async_setup_entry(
             device_class=SensorDeviceClass.ILLUMINANCE, manufacturer="BTicino", model="Light Sensor", gateway=gateway,
         )
         sensor.entity_id = entity_id_of(ctx)  # type: ignore[assignment]
+        if ctx.registry_entry is not None:
+            # yaml-era ids are `{mac}-1-{where}-illuminance`; a rebuilt id would
+            # orphan the registry entry and create a `_2` duplicate.
+            sensor._attr_unique_id = ctx.registry_entry.unique_id
         return sensor
 
     # ── WHO 4: temperature probes ───────────────────────────────────────
@@ -738,12 +743,13 @@ class MyHOMETemperatureSensor(MyHOMEEntity, SensorEntity):
     def handle_event(self, message: OWNHeatingEvent) -> None:
         """Handle an event message."""
         val = None
+        dim_raw = getattr(message, "dimension_value", None) or getattr(message, "_dimension_value", None) or []
         if message.message_type == MESSAGE_TYPE_MAIN_TEMPERATURE:
-            val = message.main_temperature
+            val = signed_who4_temperature(dim_raw[0] if dim_raw else None, message.main_temperature)
         elif message.message_type == MESSAGE_TYPE_SECONDARY_TEMPERATURE:
             sec = getattr(message, "secondary_temperature", None)
             if isinstance(sec, (list, tuple)) and len(sec) > 1:
-                val = sec[1]
+                val = signed_who4_temperature(dim_raw[0] if dim_raw else None, sec[1])
             elif isinstance(sec, (int, float)):
                 val = sec
             elif hasattr(message, "probe_temperature") and type(message.probe_temperature).__name__ != "MagicMock":

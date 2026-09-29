@@ -96,6 +96,7 @@ def test_event_session_runner_close_disarms_watchdog(mock_handler: MagicMock) ->
     """Closing runner sets flags and disarms active watchdog timeout."""
     runner = EventSessionRunner(mock_handler)
     mock_watchdog = MagicMock()
+    mock_watchdog.expired.return_value = False
     runner._event_watchdog = mock_watchdog
 
     runner.close()
@@ -103,6 +104,19 @@ def test_event_session_runner_close_disarms_watchdog(mock_handler: MagicMock) ->
     assert runner._terminate_listener
     assert runner.event_session_ready.is_set()
     mock_watchdog.reschedule.assert_called_once_with(None)
+    assert runner._event_watchdog is None
+
+
+def test_event_session_runner_close_leaves_an_expiring_watchdog_alone(mock_handler: MagicMock) -> None:
+    """Rescheduling an expired asyncio.Timeout raises; unload racing the stall must not."""
+    runner = EventSessionRunner(mock_handler)
+    mock_watchdog = MagicMock()
+    mock_watchdog.expired.return_value = True
+    runner._event_watchdog = mock_watchdog
+
+    runner.close()
+
+    mock_watchdog.reschedule.assert_not_called()
     assert runner._event_watchdog is None
 
 

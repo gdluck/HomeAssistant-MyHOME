@@ -143,10 +143,10 @@ async def test_unload_entry_keeps_state_when_platform_unload_fails(hass: HomeAss
 
 
 async def test_setup_yaml(hass: HomeAssistant):
-    """Test setup from yaml configurations returns false."""
+    """A stray `myhome:` key is ignored: returning False would stop every config entry from loading."""
     from custom_components.myhome import async_setup
     result = await async_setup(hass, {DOMAIN: {}})
-    assert not result
+    assert result
 
 async def test_services(hass: HomeAssistant):
     """Test sync_time and send_message services."""
@@ -1407,3 +1407,29 @@ async def test_no_update_listener_registered_on_entry(hass: HomeAssistant):
         # HA Core 2026.12+ prohibits update listeners when using OptionsFlowWithReload
         assert len(config_entry.update_listeners) == 0
 
+
+
+async def test_remove_entry_deletes_the_repair_issues_it_raised(hass: HomeAssistant):
+    """Issues keyed by the entry id would otherwise outlive the gateway in Settings > Repairs."""
+    from homeassistant.helpers import issue_registry as ir
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.myhome import async_remove_entry
+
+    entry = MockConfigEntry(domain=DOMAIN, data={"host": "192.0.2.10", "mac": "00:03:50:00:12:34"})
+    entry.add_to_hass(hass)
+    other = MockConfigEntry(domain=DOMAIN, data={"host": "192.0.2.11", "mac": "00:03:50:00:12:35"})
+    other.add_to_hass(hass)
+    for issue_id in (
+        f"unknown_gateway_model_{entry.entry_id}",
+        f"incompatible_decoder_platform_{entry.entry_id}_media_player.dec1",
+        f"unknown_gateway_model_{other.entry_id}",
+    ):
+        ir.async_create_issue(hass, DOMAIN, issue_id, is_fixable=False, severity=ir.IssueSeverity.WARNING, translation_key="unknown_gateway_model")
+
+    await async_remove_entry(hass, entry)
+
+    registry = ir.async_get(hass)
+    assert registry.async_get_issue(DOMAIN, f"unknown_gateway_model_{entry.entry_id}") is None
+    assert registry.async_get_issue(DOMAIN, f"incompatible_decoder_platform_{entry.entry_id}_media_player.dec1") is None
+    assert registry.async_get_issue(DOMAIN, f"unknown_gateway_model_{other.entry_id}") is not None

@@ -425,3 +425,18 @@ async def test_resync_broadcast_evicts_stale_leading_echoes(hass: HomeAssistant,
     arg = handler.send_status_request.call_args[0][0]
     assert str(arg) == "*#1*3##"
 
+
+
+@pytest.mark.asyncio
+async def test_resync_sensor_frames_are_not_member_echoes(hass: HomeAssistant, handler: MyHOMEGatewayHandler):
+    """Illuminance pushes and motion frames on WHO 1 must neither cancel nor suppress a sweep."""
+    await handler._process_message(OWNMessage.parse("*#1*25*6*150##"))
+    await handler._process_message(OWNMessage.parse("*1*34*25##"))
+    await handler._process_message(OWNMessage.parse("*1*1*#6##"))
+    await handler._process_message(OWNMessage.parse("*#1*25*6*151##"))
+    await handler._process_message(OWNMessage.parse("*1*34*25##"))
+
+    await _advance(hass)
+
+    handler.send_status_request.assert_called_once()
+    assert str(handler.send_status_request.call_args[0][0]) == "*#1*#6##"

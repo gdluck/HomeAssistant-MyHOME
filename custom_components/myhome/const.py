@@ -204,6 +204,20 @@ def percent_to_eight_bits(value: int) -> int:
     return int(round((value * 255) / 100, 0))
 
 
+def signed_who4_temperature(raw: Any, fallback: Any) -> Any:
+    """Decode a WHO 4 ``c1c2c3c4`` temperature, honouring the sign digit.
+
+    ``c1`` is ``1`` for a negative value (``1035`` is -3.5 °C). OWNd 2.0.0b8 only
+    applies the sign to dimension 15, so dimension 0 readings below zero come
+    back positive; ``fallback`` is OWNd's value, used whenever ``raw`` is not a
+    four-digit field.
+    """
+    text = str(raw) if raw is not None else ""
+    if len(text) == 4 and text.isdigit() and text[0] == "1":
+        return -float(text[1:]) / 10.0
+    return fallback
+
+
 def is_apl_address(base: str) -> bool:
     """Check if base address is a valid OpenWebNet Point-to-Point (APL) address.
 

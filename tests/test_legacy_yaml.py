@@ -350,3 +350,28 @@ async def test_legacy_yaml_mac_key_fallback_branches(mock_hass, base_entry, tmp_
         await load_legacy_myhome_yaml(mock_hass, base_entry, configured_platforms)
         assert "15" in configured_platforms["light"]
 
+
+
+async def test_legacy_yaml_climate_without_zone_does_not_reject_the_file(mock_hass, base_entry, tmp_path):
+    """A central unit relies on the default zone "#0"; injecting `where` made the whole file invalid."""
+    yaml_file = tmp_path / "myhome.yaml"
+    yaml_file.write_text(
+        """
+00:03:50:81:22:33:
+  light:
+    "41":
+      name: "Light 41"
+  climate:
+    central:
+      name: "Central unit"
+      central: true
+""",
+        encoding="utf-8",
+    )
+    configured_platforms = _make_configured_platforms()
+
+    await load_legacy_myhome_yaml(mock_hass, base_entry, configured_platforms)
+
+    assert "41" in configured_platforms["light"]
+    assert configured_platforms["climate"], "the central unit was dropped"
+    assert all("where" not in cfg or cfg.get("zone") for cfg in configured_platforms["climate"].values())

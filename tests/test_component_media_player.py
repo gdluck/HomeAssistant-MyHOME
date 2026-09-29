@@ -1477,6 +1477,9 @@ async def test_bus_off_cleans_up_group(hass, mock_gateway):
 
     await z22.async_join_players(["media_player.audio_zone_23"])
     assert z23.group_members is not None
+    # Joining wakes the member (OFF -> ON); let that wake's echo window pass so the
+    # wall-switch OFF below is not mistaken for our own OFF echo.
+    z23._wake_off_sent_at = None
 
     # Off frame for 23 from wall switch
     event = MagicMock(spec=OWNSoundEvent)
@@ -3786,7 +3789,13 @@ async def test_group_leave_off_skips_the_frame_for_a_room_that_is_already_off(ha
     zone.async_write_ha_state = MagicMock()
 
     with patch("custom_components.myhome.media_player.asyncio.sleep", new=AsyncMock()):
+        # OFF is only trusted once the bus has confirmed the room's state.
         zone._attr_state = MediaPlayerState.OFF
+        await zone._async_delayed_off()
+        zone._async_handle_turn_off.assert_awaited_once_with(from_bus=False)
+
+        zone._async_handle_turn_off.reset_mock()
+        zone._mark_status_seen()
         await zone._async_delayed_off()
         zone._async_handle_turn_off.assert_awaited_once_with(from_bus=True)
 
@@ -4046,3 +4055,97 @@ async def test_unparking_without_a_pool_just_wakes_the_zone(hass, mock_gateway):
 
     sent = [str(call.args[0]) for call in mock_gateway.send.call_args_list]
     assert sent == ["*16*13*23##", "*16*3*23##"]
+
+
+# ── Review fixes: mute, join, disband ───────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_repeated_mute_keeps_the_pre_mute_volume(hass, player):
+    """Muting an already muted room must not remember the 0.0 the first mute produced."""
+    player.async_set_volume_level = AsyncMock()
+    player._attr_volume_level = 0.6
+    player._attr_is_volume_muted = False
+
+    await player.async_mute_volume(True)
+    assert player._pre_mute_volume == 0.6
+    player._attr_volume_level = 0.0  # the bus reports the muted zone at volume 0
+
+    await player.async_mute_volume(True)
+    assert player._pre_mute_volume == 0.6
+
+    await player.async_mute_volume(False)
+    player.async_set_volume_level.assert_awaited_with(0.6)
+
+
+@pytest.mark.asyncio
+async def test_mute_without_a_known_volume_restores_the_default(hass, player):
+    player.async_set_volume_level = AsyncMock()
+    player._attr_volume_level = None
+    player._attr_is_volume_muted = False
+
+    await player.async_mute_volume(True)
+    assert player._pre_mute_volume == 0.5
+
+
+@pytest.mark.asyncio
+async def test_joining_a_leader_with_an_unknown_source_still_wakes_the_member(hass, mock_gateway):
+    """No decoder, no reported source, no default: the member is switched on and its grace OFF cancelled."""
+    runtime = MyHOMERuntimeData(gateway=mock_gateway)
+    pool = DecoderPool(hass, {"media_player.dec1": 1, "media_player.dec2": 2})
+    runtime.decoder_pool = pool
+    _create_test_zone(hass, mock_gateway, runtime, "11", "media_player.zone11")
+    zone = _create_test_zone(hass, mock_gateway, runtime, "22", "media_player.zone22")
+    new_leader = _create_test_zone(hass, mock_gateway, runtime, "44", "media_player.zone44")
+    await pool.add_member("media_player.zone11", "media_player.zone22")
+    zone._attr_state = MediaPlayerState.ON
+
+    await zone.async_unjoin_player()
+    assert zone._pending_off_task is not None
+    mock_gateway.send.reset_mock()
+
+    with patch("asyncio.sleep", return_value=None):
+        await new_leader.async_join_players(["media_player.zone22"])
+
+    assert zone._pending_off_task is None
+    assert pool.get_leader("media_player.zone22") == "media_player.zone44"
+    frames = [str(call.args[0]) for call in mock_gateway.send.call_args_list]
+    assert "*16*13*22##" not in frames  # the grace OFF never reached the bus
+    assert zone.state == MediaPlayerState.ON
+    assert zone.state == MediaPlayerState.ON
+
+
+@pytest.mark.asyncio
+async def test_switching_a_parked_leader_off_also_unparks_its_members(hass, mock_gateway):
+    """A member of a disbanded group must not keep reporting idle with its amplifier off."""
+    leader, member, pool = await _leader_with_member(hass, mock_gateway)
+    leader.async_turn_off = MyHOMEMediaPlayer.async_turn_off.__get__(leader)
+    timers, patcher = _capture_timers()
+    with patcher:
+        leader._arm_auto_off(60.0, "media_player.dec1")
+        timers[0][1](None)
+    await hass.async_block_till_done()
+    assert member._parked
+
+    await leader.async_turn_off()
+
+    assert pool.get_members(leader.entity_id) == []
+    assert not member._parked
+    assert member.state == MediaPlayerState.OFF
+
+
+@pytest.mark.asyncio
+async def test_a_parked_leader_that_unjoins_is_no_longer_parked(hass, mock_gateway):
+    leader, member, pool = await _leader_with_member(hass, mock_gateway)
+    timers, patcher = _capture_timers()
+    with patcher:
+        leader._arm_auto_off(60.0, "media_player.dec1")
+        timers[0][1](None)
+    await hass.async_block_till_done()
+    assert leader._parked
+
+    await leader.async_unjoin_player()
+
+    assert not leader._parked
+    assert leader.state == MediaPlayerState.OFF
+    assert pool.get_leader(member.entity_id) is None or pool.get_leader(member.entity_id) != leader.entity_id

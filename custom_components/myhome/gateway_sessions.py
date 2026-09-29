@@ -265,7 +265,8 @@ class EventSessionRunner:
         self._terminate_listener = True
         self._event_session_ready.set()
         if self._event_watchdog is not None:
-            self._event_watchdog.reschedule(None)
+            if not self._event_watchdog.expired():
+                self._event_watchdog.reschedule(None)
             self._event_watchdog = None
 
 

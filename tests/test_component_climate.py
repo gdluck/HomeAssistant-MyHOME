@@ -920,3 +920,22 @@ def test_zone_state_setpoint_includes_the_local_offset(hass):
     climate._local_offset = 1
     climate.handle_event(_zone_state_event("heating", "setpoint", 20.0))
     assert (climate._target_temperature, climate.target_temperature) == (20.0, 21.0)
+
+
+def test_zone_current_temperature_below_zero(hass):
+    """`*#4*1*0*1035*3##` is -3.5 °C; OWNd 2.0.0b8 only applies the sign digit to dimension 15."""
+    from OWNd.message import OWNMessage
+
+    gateway = MagicMock()
+    gateway.log_id = "test"
+    climate = MyHOMEClimate(
+        hass=hass, name="Thermostat", device_id="device_1", who="4", where="1", heating=True, cooling=False,
+        fan=False, standalone=True, central=False, manufacturer="B", model="M", gateway=gateway,
+    )
+    climate.entity_id = "climate.climate"
+    climate.async_schedule_update_ha_state = MagicMock()
+
+    climate.handle_event(OWNMessage.parse("*#4*1*0*1035*3##"))
+    assert climate.current_temperature == -3.5
+    climate.handle_event(OWNMessage.parse("*#4*1*0*0215*3##"))
+    assert climate.current_temperature == 21.5
