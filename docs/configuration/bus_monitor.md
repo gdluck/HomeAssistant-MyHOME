@@ -27,7 +27,7 @@ Unlike traditional external diagnostic tools that require a separate gateway soc
                      ▼
        ┌───────────────────────────┐
        │   WebSocket Subscription  │
-       │ (myhome/bus_monitor/sub)  │
+       │ (myhome/bus_monitor/stream)  │
        └─────────────┬─────────────┘
                      ▼
        ┌───────────────────────────┐

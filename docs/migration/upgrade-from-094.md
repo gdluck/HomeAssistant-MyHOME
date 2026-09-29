@@ -82,7 +82,7 @@ If you prefer not using the command line:
 ## 🔌 Step 3: Gateway Setup & Device Onboarding
 
 1. Once Home Assistant restarts, navigate to **Settings → Devices & Services**.
-2. If your gateway is discovered automatically via SSDP/mDNS, click **Configure**.
+2. If your gateway is discovered automatically via SSDP, click **Configure**.
 3. Otherwise, click **Add Integration**, search for **MyHOME**, and enter:
    - **Host**: IP address of your gateway.
    - **Port**: `20000`.

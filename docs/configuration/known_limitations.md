@@ -6,7 +6,7 @@ Things the integration does not do, or does with a caveat, and the reason. Where
 
 | Limitation | Why | Workaround |
 | :--- | :--- | :--- |
-| **One command session per gateway on MH200 / MH200N / MH201.** Commands are queued and paced (150 / 80 / 60 ms). | Those gateways refuse or drop overlapping sessions; the pacing is what keeps them alive. | Keep the worker count at the profile default. F454 / F455 / MyHOMEServer1 / MH202 take more workers. |
+| **One command session per gateway on MH200 / MH200N / MH201.** Commands are queued and paced (150 ms on MH200 / MH200N, 100 ms on MH201). | Those gateways refuse or drop overlapping sessions; the pacing is what keeps them alive. | Keep the worker count at the profile default. F454 / F455 / MyHOMEServer1 / MH202 take more workers. |
 | **Lights are not hydrated at startup.** State appears when the actuator first reports, or after `myhome.sweep_bus`. | `*#1*0##` is not a valid OpenWebNet request; there is no general status query for WHO 1. | Call `myhome.sweep_bus` from an automation on `homeassistant.start`, or turn something on. |
 | **Entities can be unavailable for up to 60 s after a gateway drop.** | The availability grace period hides short reconnects instead of flapping every entity. | Nothing needed; a longer outage marks entities unavailable and they recover on reconnect. |
 | **A gateway's model can be mislabelled.** | Only the WHO 13 device-type reply is available in-band, and its official table stops at 2006 hardware. | The [identification rules](gateway-identification.md) correct manual choices and raise a repair issue when evidence contradicts SSDP; use the reconfigure flow to set the model explicitly. |
@@ -17,7 +17,7 @@ Things the integration does not do, or does with a caveat, and the reason. Where
 
 | Limitation | Why | Workaround |
 | :--- | :--- | :--- |
-| **Group, area and general commands from wall switches re-sync with a ~250 ms delay, and only areas with a known light.** (P7, #368) | A debounced re-sync (see [runtime behaviour](runtime_behaviour.md#broadcast-re-sync-group-area-general)) only sweeps `*#1*A##` per area/group, or skips the sweep entirely if the gateway already echoed each member's status; there is still no trace from a gateway that echoes *nothing* to confirm the fallback is sufficient there. | Disable **Sweep group/area/general light addresses for status** in the Options Flow if your gateway needs a different cadence, and report a bus trace on #368. |
+| **Group, area and general commands from wall switches re-sync with a 0.5 s delay, and only areas with a known light.** (P7, #368) | A debounced re-sync (see [runtime behaviour](runtime_behaviour.md#broadcast-re-sync-group-area-general)) only sweeps `*#1*A##` per area/group, or skips the sweep entirely if the gateway already echoed each member's status; there is still no trace from a gateway that echoes *nothing* to confirm the fallback is sufficient there. | Disable **Sweep group/area/general light addresses for status** in the Options Flow if your gateway needs a different cadence, and report a bus trace on #368. |
 | **A declared group (`where: '#G'` in `myhome.yaml`) never auto-discovers its membership.** (P7, #368) | OpenWebNet has no command to read back which actuators a group was programmed with - that is set on the plant itself (MyHOME_Suite or a physical group-programmed actuator), not on the bus. | Declare `members:` yourself if you want derived on/off, brightness and colour state; without it the entity is `assumed_state` and shows separate On/Off controls. |
 | **Colour modes are learned, not configured.** A DALI DT8 light shows colour temperature only after its first dimension 14 frame. | The bus does not describe an actuator's capabilities; it only reports what it does. | Set `color_temp: true` / `rgb: true` / `hs: true` in `myhome.yaml` to declare the mode up front. |
 | **Native transitions depend on the actuator.** | Some dimmers ignore the fade parameter. | Keep the default `software_stepped` transition mode. |
@@ -51,7 +51,7 @@ Things the integration does not do, or does with a caveat, and the reason. Where
 | Limitation | Why | Workaround |
 | :--- | :--- | :--- |
 | **Streaming needs a network decoder per concurrent stream.** With two decoders mapped, a third room asks for *All audio matrix inputs are currently in use*. | The F441 matrix routes one physical input per source; the integration claims one decoder per playing zone. | Map more decoders in the options flow, or group rooms on the decoder side. |
-| **The legacy FM tuner (WHO 22) is not supported.** | Deferred in RFC #248; streaming replaces it. | — |
+| **The stand-alone FM tuner protocol (WHO 22) is not implemented.** | Tuners are driven through WHO 16 instead (source flagged as tuner, seek services, frequency/station attributes). | Flag the matrix input as a tuner in the options flow. |
 
 ## Scenario buttons (WHO 15 / 25)
 
@@ -66,7 +66,7 @@ Things the integration does not do, or does with a caveat, and the reason. Where
 | :--- | :--- | :--- |
 | **`entity_name` in `myhome.yaml` only applies to sensors and binary sensors.** On a light, switch, cover, thermostat, audio zone or alarm panel it is ignored: those entities *are* their device and carry the device `name`. | Home Assistant's device / entity naming model; `entity_name` never named those platforms in earlier versions either. | Rename the device in the UI, or change `name`. |
 | **Fresh installs name sensor ids after the device class** (`sensor.house_power`, `binary_sensor.cancello_opening`) where 2.0.0b12 produced `sensor.house`, `sensor.house_2`, `binary_sensor.cancello`. | The previous ids were the device name with numeric suffixes for the second and third sensor of a device. | Existing installations keep their ids; automations on a fresh install use the new ids. |
-| **Strict typing is complete.** | `mypy --strict` is fully enforced across all 31 source modules as of 2.0.0b13 (Platinum Quality Scale). | — |
+| **Strict typing is complete.** | `mypy --strict` is fully enforced across every source module as of 2.0.0b13 (Platinum Quality Scale). | — |
 | **`myhome.yaml` is a compatibility path, not the primary configuration.** Devices are discovered from the bus; YAML only adds names, device classes and options. | v2 is UI-first. | Keep `myhome.yaml` for names and `travel_time`; delete devices you no longer want from the device page. |
 | **Deleting a device does not stop it from coming back.** | Devices are re-discovered from bus traffic; a device that still exists reappears on its next status frame. | Only delete devices that are physically gone. |
 | **Home Assistant 2026.3 or newer is required** (`hacs.json`). | Current cores need Python 3.14 and dropped the pre-2026 device-registry and static-path APIs; carrying shims for cores nobody can test any more is not honest support. | Stay on integration 2.0.0b12 on older cores. |

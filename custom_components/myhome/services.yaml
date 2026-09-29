@@ -30,7 +30,7 @@ start_sending_instant_power:
       example: "sensor.general_power"
     duration:
       name: Duration
-      description: For how long the instant power information will be sent.
+      description: For how long the instant power information will be sent, in minutes (1–255).
       example: "60"
 
 turn_on_timed:

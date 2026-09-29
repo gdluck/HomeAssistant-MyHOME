@@ -32,9 +32,10 @@ To instruct the gateway to stream high-frequency instantaneous power updates to 
 
 ```yaml
 action: myhome.start_sending_instant_power
+target:
+  entity_id: sensor.general_power
 data:
-  meter_id: 1    # Meter address (e.g. 1 for F520 address 51)
-  interval: 10   # Push interval in seconds
+  duration: 10   # minutes (1–255) of instant power streaming
 ```
 
 ---

@@ -19,7 +19,7 @@ Legend: ✅ supported · 👁️ read-only · ⚙️ via a service, not an entit
 | 15 | CEN scenario pushbuttons | device triggers | ✅ | Short / long press and release, rotary dials. |
 | 16 | Sound system | `media_player` | ✅ | F441 / F441M matrices; streaming proxy for network decoders. |
 | 18 | Energy management | `sensor` | ✅ | Instantaneous power, total / daily / monthly energy. |
-| 22 | FM tuner (legacy sound system) | — | ❌ | Deferred in RFC #248; the F441 streaming proxy replaces it. |
+| 22 | FM tuner (legacy sound system) | `media_player` | 🟡 | The stand-alone WHO 22 protocol is not implemented; tuners are driven through WHO 16 (source flagged as tuner, `tuner_seek_up` / `tuner_seek_down`, frequency and station attributes). |
 | 24 | Lighting management (commercial) | — | ❌ | BMNE500 / BMview controllers; out of residential scope. |
 | 25 | CEN+ pushbuttons and dry contacts | device triggers, `binary_sensor` | ✅ | Short / long press, release; F482 / 3477 dry contacts. |
 
@@ -108,21 +108,25 @@ Legend: ✅ supported · 👁️ read-only · ⚙️ via a service, not an entit
 | On / off, volume, mute, source 0–4 | ✅ | Per zone / amplifier. |
 | Streaming (play, pause, next, previous) | ✅ | Only when decoders are mapped in the options flow: the zone becomes a Music Assistant / Spotify target and routes the matrix to a free decoder. |
 | Media metadata | 👁️ | Mirrored from the decoder while a stream is active. |
-| Speaker groups | ❌ | Use Home Assistant / Music Assistant grouping on the decoders. |
+| Speaker groups | ✅ | `media_player.join` / `unjoin` route members to the leader's source (see [media player](media_player.md)). |
+| FM tuner (seek, frequency, station) | ✅ | Sources flagged as tuner in the options flow; `myhome.tuner_seek_up` / `tuner_seek_down`. |
 
 ### Device triggers (WHO 15 / 25)
 
 | Trigger | CEN | CEN+ |
 | :--- | :---: | :---: |
-| Short press / short release | ✅ | ✅ |
+| Short press | ✅ | ✅ |
+| Short release | ✅ | ❌ (CEN+ has no short-release frame) |
 | Long press / long release | ✅ | ✅ |
-| Rotary dial clockwise / counter-clockwise, slow and fast | ✅ | ✅ |
+| Long press repeat | ❌ | ✅ |
+| Rotary dial clockwise / counter-clockwise, slow and fast | ❌ | ✅ |
+| Gateway triggers `centralized_shutter_open` / `close` / `stop` | ✅ (on the gateway device) | ✅ (on the gateway device) |
 
 Buttons 0–31 per device; every trigger carries the gateway MAC so multi-gateway plants do not cross-fire.
 
 ## Services
 
-All services are documented in the [Services Reference](services.md): `send_message`, `turn_on_timed`, `sync_time`, `start_sending_instant_power`, `sweep_bus`, `calibrate_cover`, `stop_cover_calibration`, `set_cover_travel_time`, `reset_cover_travel_time`.
+All services are documented in the [Services Reference](services.md): `send_message`, `turn_on_timed`, `sync_time`, `start_sending_instant_power`, `sweep_bus`, `calibrate_cover`, `stop_cover_calibration`, `set_cover_travel_time`, `reset_cover_travel_time`, `tuner_seek_up`, `tuner_seek_down`.
 
 ## Diagnostics and tooling
 
