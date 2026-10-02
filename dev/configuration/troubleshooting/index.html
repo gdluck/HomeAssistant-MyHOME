@@ -1422,6 +1422,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#heating-zone-unresponsive-repair-alert-on-central-unit-3550-4695-or-phantom-climate-zone-99" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Heating zone unresponsive" repair alert on central unit (3550 / 4695) or phantom "Climate Zone 99"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#cover-position-is-wrong" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1455,10 +1466,43 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#playing-music-to-a-room-vs-backend-streamer-why-you-should-never-group-them" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Playing music to a room vs. backend streamer (Why you should never group them)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-can-you-have-stereo-with-only-2-wires-do-i-need-an-l4561n-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How can you have stereo with only 2 wires? / Do I need an L4561N interface?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#all-audio-matrix-inputs-are-currently-in-use" class="md-nav__link">
     <span class="md-ellipsis">
       
         "All audio matrix inputs are currently in use"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reporting-an-audio-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reporting an audio problem
       
     </span>
   </a>
@@ -2388,6 +2432,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#heating-zone-unresponsive-repair-alert-on-central-unit-3550-4695-or-phantom-climate-zone-99" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Heating zone unresponsive" repair alert on central unit (3550 / 4695) or phantom "Climate Zone 99"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#cover-position-is-wrong" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2421,10 +2476,43 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#playing-music-to-a-room-vs-backend-streamer-why-you-should-never-group-them" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Playing music to a room vs. backend streamer (Why you should never group them)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-can-you-have-stereo-with-only-2-wires-do-i-need-an-l4561n-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How can you have stereo with only 2 wires? / Do I need an L4561N interface?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#all-audio-matrix-inputs-are-currently-in-use" class="md-nav__link">
     <span class="md-ellipsis">
       
         "All audio matrix inputs are currently in use"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reporting-an-audio-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reporting an audio problem
       
     </span>
   </a>
@@ -2620,14 +2708,45 @@
 <p>Devices are discovered from bus traffic. Deleting is meant for devices that are physically gone; one that still exists reappears on its next status frame.</p>
 <h3 id="temperature-sensor-shows-nack-errors-every-5-minutes">Temperature sensor shows <code>NACK</code> errors every 5 minutes<a class="headerlink" href="#temperature-sensor-shows-nack-errors-every-5-minutes" title="Permanent link">&para;</a></h3>
 <p>Log: <code>Could not send message *#4*&lt;ZPP&gt;*15##</code>. Probe addresses (<code>WHERE ≥ 100</code>) refuse the explicit poll. Probes are receive-only and are only polled when no reading arrived in the last interval (fixed after 2.0.0b12, issue #308); if you still see it, update the integration.</p>
+<h3 id="heating-zone-unresponsive-repair-alert-on-central-unit-3550-4695-or-phantom-climate-zone-99">"Heating zone unresponsive" repair alert on central unit (3550 / 4695) or phantom "Climate Zone 99"<a class="headerlink" href="#heating-zone-unresponsive-repair-alert-on-central-unit-3550-4695-or-phantom-climate-zone-99" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Central Unit (<code>#0</code> / <code>#0#1</code>) false-positive</strong>: Central units were previously polled with Dimension 14 status requests (<code>*#4*#0*14##</code>), which central units and gateways reject with NACK because OpenWebNet specifies Dimension 14 status reads only for subordinate zone addresses <code>1..99</code>. Central units receive their setpoints and modes via commands (<code>*#4*#0*#14*T*M##</code>), autonomous broadcast events, or restored state, but do not answer point-to-point status queries. This triggered a false-positive <code>"unresponsive zone"</code> repair alert. Central units are now exempt from point-to-point status polling and any stale repair alert is cleared on startup.</li>
+<li><strong>"Centrale termoregolazione 99 zone" vs "Climate Zone 99" / "Climate Zone 0"</strong>: The BTicino 3550 is commercially marketed as the <em>"Centrale termoregolazione 99 zone"</em> because it can manage up to 99 subordinate zones, but its OpenWebNet central unit address is strictly <code>#0</code>.</li>
+<li><strong>Ghost Zone 99</strong>: If a user configured <code>zone: 99</code> or <code>zone: "99"</code> in <code>myhome.yaml</code> based on the commercial product name, Home Assistant created and persisted <code>&lt;mac&gt;-4-99</code> in the Entity Registry. Because zone 99 does not physically exist on that bus, its Dimension 14 query (<code>*#4*99*14##</code>) failed, raising an <code>unresponsive_zone</code> repair alert.</li>
+<li><strong>Resolution</strong>: Delete the phantom entity in <strong>Settings → Devices &amp; services → Entities</strong>. Removing the entity deletes its entry from Home Assistant's Entity Registry; Home Assistant then invokes <code>async_will_remove_from_hass()</code>, which confirms the registry entry is gone and permanently clears the repair issue from the Issue Registry. Because physical 3550 traffic is addressed to <code>#0</code>, bus sweeps will never resurrect or invent Zone 99. (If an installation physically contains a 99th zone thermostat, genuine traffic addressed to zone 99 will discover and manage it normally).</li>
+<li><strong>YAML &amp; Bus Coalescing</strong>: When configured in <code>myhome.yaml</code> (e.g. <code>zone: "#0"</code> named <code>Centrale termoregolazione</code>), the YAML device and bus discovery coalesce cleanly on address <code>#0</code>, routing all broadcast traffic to the configured entity without creating a duplicate <code>Climate Zone 0</code> entity.</li>
+</ul>
 <h3 id="cover-position-is-wrong">Cover position is wrong<a class="headerlink" href="#cover-position-is-wrong" title="Permanent link">&para;</a></h3>
 <p>Timed covers estimate position from the travel time. Calibrate it (<code>myhome.calibrate_cover</code> or the device's <strong>Calibrate travel time</strong> button) or measure it with a stopwatch and save it with <code>myhome.set_cover_travel_time</code>. A full open or close resynchronises the estimate. Position-reporting actuators (dimension 10) are exact; if yours reports position but the entity does not follow, set <code>advanced_shutter: true</code> in <code>myhome.yaml</code>.</p>
 <h3 id="calibration-fails-with-no-stop-status-from-the-actuator">Calibration fails with "no stop status from the actuator"<a class="headerlink" href="#calibration-fails-with-no-stop-status-from-the-actuator" title="Permanent link">&para;</a></h3>
 <p>The actuator did not report its stop within 180 s, or an MH200 / MH200N delayed the frame. See <a href="../known_limitations/#covers-who-2">Covers</a>; use the manual travel time instead.</p>
 <h3 id="music-assistant-does-not-offer-the-audio-zone-as-a-player">Music Assistant does not offer the audio zone as a player<a class="headerlink" href="#music-assistant-does-not-offer-the-audio-zone-as-a-player" title="Permanent link">&para;</a></h3>
-<p>The zone only advertises <code>play_media</code> when at least one decoder is mapped in the options flow (<strong>Configure → Dynamic Proxy Decoders</strong>). After saving, the zone re-publishes its features; reload Music Assistant's player list. See <a href="../media_player/">Sound System</a>.</p>
+<p>Two conditions must be met for a MyHOME room to appear and accept playback in Music Assistant:</p>
+<ol>
+<li><strong>Home Assistant Player Provider in Music Assistant:</strong> Music Assistant does not expose Home Assistant media players automatically. In Music Assistant, navigate to <strong>Settings → Providers → Add Provider → Home Assistant (Player Provider)</strong>, connect to your Home Assistant instance, and ensure the MyHOME room amplifier entities (<code>media_player.&lt;room&gt;</code>) are selected and enabled.</li>
+<li><strong>Dynamic Proxy Decoders mapped in MyHOME:</strong> A MyHOME room entity only advertises <code>play_media</code> (streaming support) when at least one streaming decoder is mapped in the integration options (<strong>Settings → Devices &amp; Services → MyHOME → Configure → Decoders</strong>). Without a decoder, zones operate in standalone WHO 16 mode (power, volume, source only). After mapping a decoder, reload Music Assistant's player list. See <a href="../media_player/">Sound System</a>.</li>
+</ol>
+<h3 id="playing-music-to-a-room-vs-backend-streamer-why-you-should-never-group-them">Playing music to a room vs. backend streamer (Why you should never group them)<a class="headerlink" href="#playing-music-to-a-room-vs-backend-streamer-why-you-should-never-group-them" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Question / Misconception:</strong> <em>"The streamer plugged into the matrix is <code>Livingroom 1_3519</code>, but I want to hear music in <code>Bathroom</code>. Should I create a group containing <code>Livingroom 1_3519</code> and <code>Bathroom</code> so both play?"</em></li>
+<li><strong>Solution:</strong> <strong>No! Never group your backend streamer with a destination room.</strong></li>
+<li>Map <code>Livingroom 1_3519</code> as a <strong>Decoder</strong> in MyHOME options (<strong>Configure → Decoders</strong>).</li>
+<li>In Music Assistant, target and play directly to <strong><code>Bathroom</code></strong>.</li>
+<li>Behind the scenes, MyHOME automatically claims the streamer from the pool, wakes the Bathroom amplifier, routes the F441/F441M matrix to that input, and forwards the stream URL to the streamer.</li>
+<li>Grouping the streamer and the room causes Music Assistant to stream to both the physical streamer and the virtual proxy at the same time, leading to stream collisions, desynchronization, or audio loops.</li>
+<li>Groups in Music Assistant are <strong>only</strong> for multi-room playback across <strong>multiple destination rooms</strong> (e.g., Bathroom + Living Room). Never add the backend streamer to that group.</li>
+</ul>
+<h3 id="how-can-you-have-stereo-with-only-2-wires-do-i-need-an-l4561n-interface">How can you have stereo with only 2 wires? / Do I need an L4561N interface?<a class="headerlink" href="#how-can-you-have-stereo-with-only-2-wires-do-i-need-an-l4561n-interface" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>The 2-wire SCS bus carries both control and audio.</strong> In BTicino MyHOME <em>Diffusion Sonore 2 Fils</em>, the 2-wire SCS bus simultaneously carries 27V DC power, OpenWebNet digital control frames (WHO 16: power, volume, input routing), and high-frequency modulated stereo audio over the same pair of conductors. There is no separate analog audio cabling running to room amplifiers.</li>
+<li><strong>Why you need an audio source interface for external streamers.</strong> External streamers, DACs, or phones output standard baseband analog stereo line-level audio (via RCA or 3.5mm jack). They cannot connect directly to SCS bus terminals. An audio source interface module—such as the Legrand / BTicino <strong>L4561N</strong> (4 DIN stereo source interface with RCA inputs and IR control), <strong>L4560 / HS4560 / N4560 / NT4560 / HC4560</strong> (modular flush-mount RCA sockets), or <strong>3482</strong> (auxiliary line preamplifier)—is required to modulate the line-level audio onto the 2-wire SCS bus into one of the matrix source inputs (S1–S4).</li>
+<li><strong>Ground isolation (art. 3495):</strong> When connecting external Class I (earthed) equipment or multiple audio sources, install the <strong>3495</strong> source isolator between the streamer and the interface to provide 1500 Vrms galvanic isolation, preserving SELV bus compliance and eliminating ground hum.</li>
+<li><strong>Stereo vs. mono:</strong> The F441/F441M matrix and L4561N interface support true stereo (L/R) distribution. Whether you hear stereo in a given room depends on the amplifier installed in that room (e.g. H4562, F502, or 3484/3487 stereo amplifiers) and whether two speakers (L + R) are wired to it. See the <a href="../media_player/#official-bticino-2-wire-sound-system-wiring-schematic">official wiring schematic in the Sound System Guide</a>.</li>
+</ul>
 <h3 id="all-audio-matrix-inputs-are-currently-in-use">"All audio matrix inputs are currently in use"<a class="headerlink" href="#all-audio-matrix-inputs-are-currently-in-use" title="Permanent link">&para;</a></h3>
 <p>Every playing zone claims one decoder; map more decoders or stop playback in another room.</p>
+<h3 id="reporting-an-audio-problem">Reporting an audio problem<a class="headerlink" href="#reporting-an-audio-problem" title="Permanent link">&para;</a></h3>
+<p>Download the MyHOME diagnostics (<em>Devices &amp; services → MyHOME → ⋮ → Download diagnostics</em>) and attach it to the issue; its <code>audio</code> block shows every zone, decoder and group without room names. Add the Music Assistant log only if the problem is on the Music Assistant side. See <a href="../media_player/#reporting-an-audio-problem">Reporting an audio problem</a>.</p>
 <h2 id="bus-and-gateway-behaviour">Bus and gateway behaviour<a class="headerlink" href="#bus-and-gateway-behaviour" title="Permanent link">&para;</a></h2>
 <h3 id="could-not-send-message-160-or-20-40-at-every-start"><code>Could not send message *#16*0##</code> (or <code>*#2*0##</code>, <code>*#4*0##</code>) at every start<a class="headerlink" href="#could-not-send-message-160-or-20-40-at-every-start" title="Permanent link">&para;</a></h3>
 <p>Startup discovery only asks for subsystems the gateway profile advertises. The bare <code>*#16*0##</code> was the wrong frame and every gateway NACKs it; current versions send <code>*#16*0*5##</code>. If a status request is still rejected, check that the gateway model is right and correct it with the reconfigure flow.</p>
