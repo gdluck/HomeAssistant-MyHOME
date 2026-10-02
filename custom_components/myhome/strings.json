@@ -7,7 +7,7 @@
         "title": "Pick your \"MyHome\" gateway",
         "description": "MyHOME keeps one permanent event connection plus one connection per command worker (default 1) open to the gateway. A gateway only accepts a handful of simultaneous OpenWebNet connections (5 on an F455, fewer on an MH200N), shared with everything else that talks to it: the Legrand/BTicino Home+Project app, other Home Assistant instances, other integrations. If the connections run out, either MyHOME or the other client gets refused or dropped. Close other clients you do not need, and keep the command worker count low.",
         "data": {
-          "host": "IP address"
+          "serial": "Gateway"
         }
       },
       "port": {
@@ -59,7 +59,8 @@
         "data": {
           "host": "IP address",
           "port": "Port / Baudrate",
-          "password": "Password"
+          "password": "Password",
+          "baudrate": "Baudrate"
         }
       },
       "bus_topology": {
@@ -115,6 +116,7 @@
         "title": "MyHome options",
         "description": "Advanced system settings and streaming decoder mapping",
         "data": {
+          "name": "Gateway model",
           "source_1_name": "Source 1 — name of what is wired to matrix input S1 (leave blank if nothing is connected)",
           "source_1_tuner": "Source 1 is a tuner (F500): adds a radio entity with stations, frequency and RDS",
           "source_2_name": "Source 2 — name of what is wired to matrix input S2 (leave blank if nothing is connected)",

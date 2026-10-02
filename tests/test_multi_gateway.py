@@ -1565,7 +1565,7 @@ def test_gateway_tier_and_capabilities() -> None:
     h4890_whos = gateway_supported_whos("H4890")
     mh202_whos = gateway_supported_whos("MH202")
 
-    assert 5 not in f454_whos
+    assert 5 in f454_whos  # the alarm is relayed by every gateway but the MyHomeServer1
     assert 1 in f454_whos
     assert 2 in f454_whos
     assert 4 in f454_whos
@@ -2223,3 +2223,47 @@ def test_validate_shared_bus_topology_scenarios(hass: HomeAssistant) -> None:
     assert errs_circular[CONF_PRIMARY_GATEWAY] == "circular_gateway_reference"
 
 
+
+
+def test_gateway_supported_whos_includes_alarm_and_auxiliaries() -> None:
+    """OWNd profiles list no WHO 5 / 9; every gateway relays them (MyHomeServer1 excepted for the alarm)."""
+    from custom_components.myhome.topology import gateway_supported_whos
+
+    f454 = gateway_supported_whos("F454")
+    assert {5, 9} <= f454
+    mhs1 = gateway_supported_whos("MyHomeServer1")
+    assert 9 in mhs1 and 5 not in mhs1
+
+
+async def test_options_flow_does_not_infer_a_role_on_a_standalone_gateway(hass: HomeAssistant) -> None:
+    """Without a shared bus the form suggests 'primary': a suggested 'secondary' would fail its own validation."""
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.myhome.const import (
+        CONF_DELEGATED_WHOS,
+        CONF_GATEWAY_ROLE,
+        CONF_PRIMARY_GATEWAY,
+        ROLE_PRIMARY,
+    )
+
+    pri_entry = MockConfigEntry(
+        domain=DOMAIN, title="MyHomeServer1 Gateway", data={"name": "MyHomeServer1", "mac": "00:03:50:aa:bb:01"},
+    )
+    sec_entry = MockConfigEntry(
+        domain=DOMAIN, title="H4890 Gateway", data={"name": "H4890", "mac": "00:03:50:aa:bb:02"},
+        options={CONF_PRIMARY_GATEWAY: "00:03:50:aa:bb:01"},  # topology left standalone
+    )
+    pri_entry.add_to_hass(hass)
+    sec_entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(sec_entry.entry_id)
+    assert result["type"] == "form"
+    seen = set()
+    for k in result["data_schema"].schema:
+        if str(k) == CONF_GATEWAY_ROLE:
+            assert k.description["suggested_value"] == ROLE_PRIMARY
+            seen.add("role")
+        elif str(k) == CONF_DELEGATED_WHOS:
+            assert k.description["suggested_value"] == []
+            seen.add("whos")
+    assert seen == {"role", "whos"}

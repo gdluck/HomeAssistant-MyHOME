@@ -7,7 +7,7 @@
         "title": "Kies uw \"MyHome\" gateway",
         "description": "MyHOME houdt één permanente eventverbinding open, plus één verbinding per commandoworker (standaard 1). Een gateway accepteert maar een handvol gelijktijdige OpenWebNet-verbindingen (5 bij een F455, minder bij een MH200N), gedeeld met alles wat er verbinding mee maakt: de Legrand/BTicino Home+Project-app, andere Home Assistant-installaties, andere integraties. Als de verbindingen op zijn, wordt MyHOME of de andere client geweigerd of verbroken. Sluit clients die u niet nodig hebt en houd het aantal commandoworkers laag.",
         "data": {
-          "host": "IP adres"
+          "serial": "Gateway"
         }
       },
       "port": {
@@ -59,7 +59,8 @@
         "data": {
           "host": "IP-adres",
           "port": "Poort / baudrate",
-          "password": "Wachtwoord"
+          "password": "Wachtwoord",
+          "baudrate": "Baudrate"
         }
       },
       "bus_topology": {
@@ -112,6 +113,7 @@
         "title": "MyHome opties",
         "description": "Gevorderde systeem settings",
         "data": {
+          "name": "Gatewaymodel",
           "source_1_name": "Bron 1 — naam van wat op matrix-ingang S1 is aangesloten (leeg laten als er niets op zit)",
           "source_1_tuner": "Bron 1 is een tuner (F500): voegt een radio-entiteit toe met zenders, frequentie en RDS",
           "source_2_name": "Bron 2 — naam van wat op matrix-ingang S2 is aangesloten (leeg laten als er niets op zit)",

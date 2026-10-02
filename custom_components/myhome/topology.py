@@ -88,6 +88,12 @@ def gateway_supported_whos(model: str | None) -> set[int]:
     except Exception:
         pass
 
+    if whos:
+        # OWNd profiles list no WHO 5 (burglar alarm) or WHO 9 (auxiliaries), yet
+        # every gateway relays those bus frames; without them the alarm and the
+        # auxiliary channels could never be delegated to a secondary gateway.
+        whos |= {5, 9}
+
     # Model-specific hardware capability constraints:
     # MyHomeServer1 firmware does not route audio (WHO 16 / WHO 22) or burglar alarm (WHO 5).
     if "MYHOMESERVER1" in norm:

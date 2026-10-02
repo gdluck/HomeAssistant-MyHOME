@@ -74,11 +74,12 @@ async def test_diagnostics_with_full_gateway_and_bus_monitor(hass: HomeAssistant
     mock_entry.options = {}
 
     # Mock gateway and profile
-    mock_profile = MagicMock()
-    mock_profile.name = "MH200N"
+    # The attribute names are OWNd's (GatewayProfile.model_name / event_keepalive_interval)
+    mock_profile = MagicMock(spec=["model_name", "command_queue_delay", "max_queue_size", "event_keepalive_interval"])
+    mock_profile.model_name = "MH200N"
     mock_profile.command_queue_delay = 0.05
     mock_profile.max_queue_size = 250
-    mock_profile.keepalive_interval = 90.0
+    mock_profile.event_keepalive_interval = 90.0
 
     mock_gw = MagicMock()
     mock_gw.model_name = "MH200N"

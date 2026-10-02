@@ -103,11 +103,14 @@ async def async_get_config_entry_diagnostics(
                 gw_info["identification"] = async_redact_data(identification(), TO_REDACT)
             if hasattr(gw, "profile") and gw.profile:
                 profile = gw.profile
+                # OWNd profiles name these model_name and event_keepalive_interval.
                 profile_info = {
-                    "name": getattr(profile, "name", "Generic"),
+                    "name": getattr(profile, "model_name", None) or getattr(profile, "name", "Generic"),
                     "command_queue_delay": getattr(profile, "command_queue_delay", 0.0),
                     "max_queue_size": getattr(profile, "max_queue_size", 250),
-                    "keepalive_interval": getattr(profile, "keepalive_interval", 90.0),
+                    "keepalive_interval": getattr(
+                        profile, "event_keepalive_interval", getattr(profile, "keepalive_interval", 90.0)
+                    ),
                 }
 
         send_buffer = getattr(gateway_handler, "send_buffer", None)
