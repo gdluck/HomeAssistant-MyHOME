@@ -634,7 +634,7 @@ automated coverage and physical gateway verification steps.
 ### CI Workflows
 - **`hassfest`**: Official Home Assistant manifest, translation, and metadata validation.
 - **`validate`**: Official HACS compliance checks.
-- **`test-coverage`**: 2991 automated unit tests with snapshot matching and 100% line coverage enforcement on the `ownd` core package.
+- **`test-coverage`**: 3124 automated unit tests with snapshot matching and 100% line coverage enforcement on the `ownd` core package.
 - **`ha-container-smoke`**: Automated containerized smoke testing against official Home Assistant Docker images (`stable`, `beta`, `dev`) verifying `check_config`, clean platform module imports, and zero asyncio loop-blocking calls.
 - **`ownd-smoke`**: Automated smoke testing of the `OWNd` protocol engine across `pinned`, `latest`, and `upstream-dev` distributions on Python 3.14.
 - **`ha-upstream-compat`**: Continuous integration testing against upstream Home Assistant Stable, Beta, and Dev channels.
@@ -662,7 +662,7 @@ _Self-audit of [`quality_scale.yaml`](custom_components/myhome/quality_scale.yam
 
 ### 📊 Code Coverage & Quality Assurance
 
-The integration maintains 2991 automated unit tests (100% line coverage across all modules) covering core protocol handling, hardware profiles, discovery, state reconciliation, and error boundaries.
+The integration maintains 3124 automated unit tests (100% line coverage across all modules) covering core protocol handling, hardware profiles, discovery, state reconciliation, and error boundaries.
 
 <!-- START_COVERAGE_TABLE -->
 
@@ -716,6 +716,7 @@ The integration maintains 2991 automated unit tests (100% line coverage across a
 | [`sound_source.py`](custom_components/myhome/sound_source.py) | **100%** | Core integration component |
 | [`switch.py`](custom_components/myhome/switch.py) | **100%** | Relay actuators, auxiliary switches, socket controllers |
 | [`topology.py`](custom_components/myhome/topology.py) | **100%** | Core integration component |
+| [`typing_compat.py`](custom_components/myhome/typing_compat.py) | **100%** | Core integration component |
 | [`validate.py`](custom_components/myhome/validate.py) | **100%** | Device & gateway schemas, custom WHERE validators, sensor injections |
 | [`websocket.py`](custom_components/myhome/websocket.py) | **100%** | WebSocket API for real-time bus streaming, history, and diagnostics |
 | [`where_grammar.py`](custom_components/myhome/where_grammar.py) | **100%** | Core integration component |
