@@ -91,7 +91,7 @@ You can adjust integration runtime parameters at any time without re-adding the 
 <!-- GATEWAY_OPTIONS_START -->
 | Option | Key | Selector / Type | Default | Session / Model Limits | Description |
 | :--- | :--- | :---: | :---: | :--- | :--- |
-| **Command Worker Concurrency** | `command_worker_count` | Integer | `1` | Range 1–10 (capped by model: 1 for MH200/MH201, 2 for MH202, 4 for F454/MHS1) | Number of concurrent asynchronous command sessions dispatched to the gateway. |
+| **Command Worker Concurrency** | `command_worker_count` | Integer | Profile default (`2` on MyHomeServer1, `1` elsewhere) | Range 1–10 (capped by model: 1 for MH200/MH201, 2 for MH202, 4 for F454/F455/F461/MHS1) | Number of concurrent asynchronous command sessions dispatched to the gateway. |
 | **Dimmer Transition Mode** | `transition_mode` | Select | `software_stepped` | `software_stepped`, `native`, `auto` | Home Assistant software-stepped fade vs native hardware speed parameter. |
 | **Event Bus Broadcasting** | `generate_events` | Boolean | `False` | All gateways | Emits raw OpenWebNet bus frames onto the Home Assistant event bus as `myhome_message_event`. |
 | **Broadcast Re-sync** | `broadcast_resync` | Boolean | `True` | All gateways | After a group, area or general lighting command, waits a 0.5 s debounce window for member echoes and then sweeps the group/area addresses for status (UI label: *Sweep group/area/general light addresses for status*). |
@@ -112,7 +112,7 @@ You can adjust integration runtime parameters at any time without re-adding the 
 <!-- GATEWAY_OPTIONS_END -->
 
 ### 1. Command Worker Concurrency (`command_worker_count`)
-- **Range**: `1` to `10` (Default: `1`).
+- **Range**: `1` to `10`. New entries start at the model profile's recommended count (`2` on MyHomeServer1, `1` on every other model), which leaves connections free for the Legrand/BTicino app.
 - Dynamically capped and validated against the gateway model's hardware limit:
   - **1 worker**: MH200, MH200N, MH201, F452, F453AV, AM4890 / H4890 / LN4890, Legrand 3578 Serial, Generic.
   - **2 workers**: MH202.
