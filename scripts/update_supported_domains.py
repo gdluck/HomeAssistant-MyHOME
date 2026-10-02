@@ -48,14 +48,14 @@ DOMAIN_METADATA: dict[str, dict[str, str]] = {
         "capabilities": (
             "On/Off, Dimmers with brightness control & transitions (stepped & native), "
             "DALI DT8 Tunable White (Dimension 14, 2000K–6535K), HS/RGB colour, "
-            "Hardware-offloaded bus timers (`myhome.turn_on_timed` / `timer` parameter)"
+            "Hardware-offloaded bus timers (`myhome.turn_on_timed`)"
         ),
     },
     "switch": {
         "label": "**`switch`**",
         "capabilities": (
             "Relays, auxiliary switches, socket actuators (switch/outlet device classes), "
-            "Hardware-offloaded bus timers (`myhome.turn_on_timed` / `timer` parameter)"
+            "Hardware-offloaded bus timers (`myhome.turn_on_timed`)"
         ),
     },
     "cover": {
@@ -111,7 +111,7 @@ DOMAIN_METADATA: dict[str, dict[str, str]] = {
         "label": "**`device_trigger`** *(Automations)*",
         "capabilities": (
             'Stateless CEN & CEN+ scenario pushbuttons with string-preserved addressing (`"0001"`), '
-            "gateway MAC isolation, and 8 native UI trigger types (short press, long press start, held, release, rotary dials)"
+            "gateway MAC isolation, and 9 native UI trigger types (short press, long press start, held, release, rotary dials)"
         ),
     },
 }

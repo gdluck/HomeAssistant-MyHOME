@@ -2,7 +2,7 @@
 
 The **MyHOME** integration provides monitoring for dry contact interfaces, PIR motion sensors, and security auxiliary contacts across OpenWebNet **WHO = 25**, **WHO = 1**, and **WHO = 9**.
 
-In v2, setup and management are **100% UI-first**: binary sensors are automatically discovered from SCS bus events, and device presentation (such as choosing between a door sensor, window contact, or motion detector) is configured directly in Home Assistant's UI settings.
+In v2, setup and management are **100% UI-first**: dry contacts and motion sensors are automatically discovered from SCS bus events (auxiliary channels, WHO = 9, are declared in `myhome.yaml`), and device presentation (such as choosing between a door sensor, window contact, or motion detector) is configured directly in Home Assistant's UI settings.
 
 ---
 
@@ -45,4 +45,4 @@ In legacy versions, specifying whether a contact was a door, garage door, or win
 ## 🔄 Legacy YAML Note
 
 > [!NOTE]
-> If you are upgrading from legacy v0.9 installations and still have manual `binary_sensor:` blocks in `/config/myhome.yaml`, please refer to the [v0.9.4 Legacy Binary Sensor Documentation](../../0.9.4/configuration/binary-sensors/) or the [Legacy YAML Migration Guide](../migration/legacy-yaml.md). In v2, all binary sensors are discovered dynamically.
+> If you are upgrading from legacy v0.9 installations and still have manual `binary_sensor:` blocks in `/config/myhome.yaml`, please refer to the [v0.9.4 Legacy Binary Sensor Documentation](../../0.9.4/configuration/binary-sensors/) or the [Legacy YAML Migration Guide](../migration/legacy-yaml.md). In v2, dry contacts and motion sensors are discovered dynamically; auxiliary channels (WHO = 9) still need their `binary_sensor:` entries, as nothing on the bus announces them.

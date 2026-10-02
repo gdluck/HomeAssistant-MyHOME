@@ -253,7 +253,7 @@
     },
     "sweep_bus": {
       "name": "Busstatus scannen",
-      "description": "Voert een alleen-lezen statusverzoek uit over alle bussubsystemen (verlichting, rolluiken, klimaatregeling, klok en gatewaydiagnostiek) om de diagnostische ringbuffer te vullen.",
+      "description": "Voert een alleen-lezen statusverzoek uit over alle bussubsystemen (rolluiken, klimaatregeling, inbraakalarm, geluidssysteem, energiemeters, klok en gatewaydiagnostiek) om de diagnostische ringbuffer te vullen.",
       "fields": {
         "gateway": {
           "name": "Gateway",

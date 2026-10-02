@@ -14,7 +14,7 @@ This document provides a comprehensive reference for all custom services registe
 | [`myhome.start_sending_instant_power`](#4-myhomestart_sending_instant_power) | `sensor` | Request a temporary continuous stream of instant power readings from an energy meter. |
 | [`myhome.sweep_bus`](#5-myhomesweep_bus) | Gateway | Actively poll status across all subsystems to populate diagnostic buffers. |
 | [`myhome.calibrate_cover`](#6-myhomecalibrate_cover) | `cover` | Measure a timed cover's up and down travel times on the bus and store them. |
-| [`myhome.stop_cover_calibration`](#7-myhomestop_cover_calibration) | Gateway | Stop the running calibration and cancel queued ones. |
+| [`myhome.stop_cover_calibration`](#7-myhomestop_cover_calibration) | Gateway / `cover` | Stop the running calibration and cancel queued ones. |
 | [`myhome.set_cover_travel_time`](#8-myhomeset_cover_travel_time) | `cover` | Store stopwatch-measured travel times without driving the cover. |
 | [`myhome.reset_cover_travel_time`](#9-myhomereset_cover_travel_time) | `cover` | Forget measured / manual travel times; back to YAML or the default. |
 | [`myhome.tuner_seek_up`](#10-myhometuner_seek_up) | `media_player` | Seek forward to the next receivable FM radio frequency on an F500 tuner. |
@@ -114,7 +114,7 @@ data:
 
 ## 5. `myhome.sweep_bus`
 
-Actively queries status across all configured subsystems (lighting, automation, thermoregulation, and gateway diagnostics). It is used to refresh entity states and populate the in-band **Bus Monitor** with fresh data for troubleshooting.
+Actively queries status across the configured subsystems (automation, thermoregulation, burglar alarm, sound system, energy meters, gateway clock, model and firmware; lighting is left to the group/area re-sync). It is used to refresh entity states and populate the in-band **Bus Monitor** with fresh data for troubleshooting.
 
 ### Fields
 | Parameter | Type | Required | Description | Example |
@@ -158,7 +158,7 @@ target:
 
 ## 7. `myhome.stop_cover_calibration`
 
-Stops the calibration that is running and cancels every cover still queued behind it. The moving cover receives a stop command, its calibration event reports `phase: failed` with *Calibration stopped by user*, and nothing is stored. Without a `gateway` every gateway's queue is cleared. Also available as an entity service on any cover (targets that cover's gateway).
+Stops the calibration that is running and cancels every cover still queued behind it. The moving cover receives a stop command, its calibration event reports `phase: failed` with *Calibration stopped by user*, and nothing is stored. Without a `gateway` every gateway's queue is cleared; targeting one or more covers instead stops only the gateways those covers belong to.
 
 ### Fields
 | Parameter | Type | Required | Description | Example |
@@ -174,7 +174,7 @@ action: myhome.stop_cover_calibration
 
 ## 8. `myhome.set_cover_travel_time`
 
-Stores the physical travel times of a timed cover **by hand** — the manual alternative to `calibrate_cover` for gateways that cannot calibrate reliably (MH200 / MH200N single-session pacing, or actuators with the 60 s safety cut-off). Measure the closing and opening runs with a stopwatch and pass them here. `travel_time` fills whichever direction has no explicit value; note that `travel_time_down` on its own also sets the up time (the two are assumed equal unless `travel_time_up` is given), whereas `travel_time_up` on its own leaves the stored down time untouched — pass both when you only want to change one. Values must lie between 1 s and 180 s; anything else is rejected before the entity is touched. The result is stored exactly like a measured calibration (`calibration_source: manual`).
+Stores the physical travel times of a timed cover **by hand** — the manual alternative to `calibrate_cover` for gateways that cannot calibrate reliably (MH200 / MH200N single-session pacing, or actuators with the 60 s safety cut-off). Measure the closing and opening runs with a stopwatch and pass them here. `travel_time` fills whichever direction has no explicit value; note that `travel_time_down` on its own also sets the up time (the two are assumed equal unless `travel_time_up` is given), whereas `travel_time_up` on its own leaves the stored down time untouched — pass both when you only want to change one. Values must lie between 1 s and 300 s; anything else is rejected before the entity is touched. The result is stored exactly like a measured calibration (`calibration_source: manual`).
 
 ### Fields
 | Parameter | Type | Required | Description | Example |

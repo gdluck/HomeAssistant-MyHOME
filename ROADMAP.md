@@ -187,7 +187,7 @@ graph LR
 * **`repair-issues`**: Active integration of Home Assistant's Repairs framework (`async_create_issue`):
   - `gateway_identity_mismatch` & `gateway_identity_corrected`: Proactively informs users if configured model conflicts with WHO=13 hardware telemetry.
   - `unconfigured_timezone` (PR #387): Automatically flags legacy gateway timezone sentinel `999` with remediation guidance.
-  - `unknown_model` (PR #388): Captures unmapped WHO=13 hardware codes (`999`) and directs users to diagnostic trace submission.
+  - `unknown_gateway_model` (PR #388): Captures unmapped WHO=13 hardware codes (`999`) and directs users to diagnostic trace submission.
 * **Complete Core Documentation Suite**: Authored all 10 Gold standard documentation chapters under `docs/configuration/` (Architecture, Supported Functions, Gateways, Services, Runtime Behaviour, CEN/CEN+, Sound System, Troubleshooting, Lovelace Recipes, and Known Limitations).
 * **`quality_scale.yaml`**: Official compliance manifest actively tracked at `custom_components/myhome/quality_scale.yaml` and verified by `scripts/quality_scale_report.py`.
 
@@ -316,7 +316,7 @@ We offer **two simple ways** to contribute real-world bus traces, tailored to yo
 
 #### 🏷️ Track A: Zero-CLI via Home Assistant UI (Fastest & Easiest)
 Ideal for standard users running Home Assistant with the MyHOME integration:
-1. **Sweep the Bus**: In Home Assistant, go to **Developer Tools** > **Services** and call `myhome.sweep_bus` (or trigger it from the Lovelace Bus Monitor Card). This actively queries all lighting, cover, HVAC, and gateway diagnostic states in under 3 seconds.
+1. **Sweep the Bus**: In Home Assistant, go to **Developer Tools** > **Services** and call `myhome.sweep_bus` (or trigger it from the Lovelace Bus Monitor Card). This actively queries the cover, HVAC, burglar-alarm, sound-system, energy and gateway diagnostic states in under 3 seconds.
 2. **Download Diagnostics**: Navigate to **Settings** > **Devices & Services** > **MyHOME** > click the three dots (`⋮`) > **Download diagnostics** (or click **`📋 Export Trace`** on the `<myhome-bus-card>`).
 3. **Submit**: Attach the downloaded `.json` file to [**RFC Discussion #248**](https://github.com/orgs/OpenWebNet-HA/discussions/248) or open a GitHub Issue.
 4. *Privacy Guarantee*: Home Assistant and MyHOME automatically redact all passwords, authentication tokens, and private credentials before exporting.

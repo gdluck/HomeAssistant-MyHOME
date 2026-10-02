@@ -253,7 +253,7 @@
     },
     "sweep_bus": {
       "name": "Scansione stato bus",
-      "description": "Esegue una richiesta di stato in sola lettura su tutti i sottosistemi del bus (luci, tapparelle, termoregolazione, orologio e diagnostica del gateway) per popolare il buffer circolare di diagnostica.",
+      "description": "Esegue una richiesta di stato in sola lettura su tutti i sottosistemi del bus (tapparelle, termoregolazione, antifurto, diffusione sonora, contatori di energia, orologio e diagnostica del gateway) per popolare il buffer circolare di diagnostica.",
       "fields": {
         "gateway": {
           "name": "Gateway",

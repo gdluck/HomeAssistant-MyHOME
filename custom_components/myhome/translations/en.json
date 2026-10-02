@@ -268,7 +268,7 @@
     },
     "sweep_bus": {
       "name": "Sweep bus status",
-      "description": "Triggers an active read-only status query across all bus subsystems (lighting, covers, thermoregulation, clock, and gateway diagnostics) to populate the diagnostic bus monitor ring buffer.",
+      "description": "Triggers an active read-only status query across the bus subsystems (covers, thermoregulation, burglar alarm, sound system, energy meters, clock and gateway diagnostics) to populate the diagnostic bus monitor ring buffer.",
       "fields": {
         "gateway": {
           "name": "Gateway",

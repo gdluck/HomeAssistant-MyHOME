@@ -253,7 +253,7 @@
     },
     "sweep_bus": {
       "name": "Balayage de l'état du bus",
-      "description": "Déclenche une interrogation en lecture seule de tous les sous-systèmes du bus (éclairage, volets, régulation thermique, horloge et diagnostic de la passerelle) pour alimenter le tampon circulaire de diagnostic.",
+      "description": "Déclenche une interrogation en lecture seule de tous les sous-systèmes du bus (volets, régulation thermique, alarme intrusion, diffusion sonore, compteurs d'énergie, horloge et diagnostic de la passerelle) pour alimenter le tampon circulaire de diagnostic.",
       "fields": {
         "gateway": {
           "name": "Passerelle",

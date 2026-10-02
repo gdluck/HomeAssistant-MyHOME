@@ -10,7 +10,7 @@ In v2, setup and management are **100% UI-first**: alarm central units and zone 
 
 When your gateway connects to Home Assistant:
 
-1. **Dynamic Bus Discovery**: Any incoming alarm event frame on the SCS bus (e.g. `*5*1*0##` for arming, `*5*2*0##` for disarming, or `*5*15*0##` for intrusion) automatically registers the `alarm_control_panel` entity.
+1. **Dynamic Bus Discovery**: Any incoming alarm event frame on the SCS bus (e.g. `*5*8*0##` for an engaged system, `*5*2*0##` for disarming, or `*5*15*0##` for intrusion) automatically registers the `alarm_control_panel` entity.
 2. **Global Broadcast Zone 0 Listening**: Entities automatically subscribe to global broadcast zone 0 telemetry (`myhome_update_<mac>_5_0`) alongside their specific zone/partition address (`myhome_update_<mac>_5_<where>`), guaranteeing synchronized state updates across all alarm panels in your home.
 3. **UI Customization**: You can rename the alarm panel, assign it to an Area (e.g. *Entrance*, *Security*), and customize icons directly in the Home Assistant UI.
 
@@ -33,10 +33,10 @@ The `alarm_control_panel` platform provides:
 
 | State | OpenWebNet Frame | Description |
 | :--- | :--- | :--- |
-| **`disarmed`** | `*5*2*<where>##` | System deactivated, idle, or maintenance mode. |
-| **`armed_home`** | `*5*1*<where>##` | Partial perimeter arming (e.g. night mode). |
-| **`armed_away`** | `*5*1*<where>##` | Total plant armed; all zones active. |
-| **`triggered`** | `*5*15*<where>##` / `*5*17*<where>##` | Active intrusion alarm, tampering, anti-panic, or technical emergency. |
+| **`disarmed`** | `*5*0*<where>##` / `*5*2*<where>##` / `*5*9*<where>##` | Maintenance, system disengaged, or battery/system failure while disengaged. |
+| **`armed_home`** | `*5*11*<where>##` | Partial perimeter arming (e.g. night mode). |
+| **`armed_away`** | `*5*8*<where>##` | Total plant engaged; all zones active. `*5*1*<where>##` ("activation") only reports an operational system and leaves the state as it was. |
+| **`triggered`** | `*5*12*<where>##` / `*5*15*<where>##` / `*5*16*<where>##` / `*5*17*<where>##` / `*5*31*<where>##` | Active intrusion, tampering, anti-panic, technical alarm or silent alarm. |
 
 ---
 

@@ -63,7 +63,7 @@ automation:
           entity_id: vacuum.ground_floor
 ```
 
-Rotary dials (`rotary_cw_slow`, `rotary_ccw_fast`, …) work the same way — see [CEN & CEN+](cen_cenplus.md) for the eight trigger types and the dimming example.
+Rotary dials (`rotary_cw_slow`, `rotary_ccw_fast`, …) work the same way — see [CEN & CEN+](cen_cenplus.md) for the nine trigger types and the dimming example.
 
 ## 3. Shutters that report a real position
 
