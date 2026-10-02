@@ -424,6 +424,9 @@
     "cover_reports_position": {
       "message": "{name} reports its position; travel-time calibration does not apply to it"
     },
+    "cover_is_scope": {
+      "message": "{name} moves several covers at once; calibrate each of them individually"
+    },
     "calibration_in_progress": {
       "message": "{name} is already being calibrated"
     },

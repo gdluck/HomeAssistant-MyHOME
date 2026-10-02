@@ -913,3 +913,34 @@ async def test_cover_advanced_shutter_key_precedence(hass, mock_gateway):
 
     assert len(added) == 1
     assert added[0]._advanced is True
+
+
+@pytest.mark.parametrize(
+    ("cfg_extra", "source", "travel"),
+    [({"travel_time": 30}, "yaml", 30), ({}, "default", 25)],
+)
+async def test_yaml_cover_reports_where_its_travel_time_comes_from(hass, mock_gateway, cfg_extra, source, travel):
+    """A cover added from myhome.yaml says 'yaml' when travel_time is configured, on its first add too."""
+    mac = mock_gateway.mac
+    hass.data = {
+        DOMAIN: {
+            mac: {
+                "entity": mock_gateway,
+                CONF_PLATFORMS: {PLATFORM: {"35": {CONF_WHERE: "35", CONF_NAME: "Cover 35", **cfg_extra}}},
+            }
+        }
+    }
+    config_entry = MagicMock()
+    config_entry.data = {"mac": mac}
+    config_entry.entry_id = "test_entry"
+    config_entry.options = {}
+
+    added = []
+    with patch("homeassistant.helpers.entity_registry.async_entries_for_config_entry", return_value=[]), \
+         patch("homeassistant.helpers.entity_registry.async_get", return_value=MagicMock()):
+        attach_runtime(hass, config_entry)
+        await async_setup_entry(hass, config_entry, added.extend)
+
+    assert len(added) == 1
+    attrs = added[0].extra_state_attributes
+    assert attrs["calibration_source"] == source and attrs["travel_time"] == travel

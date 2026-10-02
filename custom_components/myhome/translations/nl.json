@@ -378,6 +378,9 @@
     "cover_reports_position": {
       "message": "{name} meldt zijn positie; looptijdkalibratie is daarop niet van toepassing"
     },
+    "cover_is_scope": {
+      "message": "{name} bedient meerdere rolluiken tegelijk; kalibreer elk daarvan afzonderlijk"
+    },
     "calibration_in_progress": {
       "message": "{name} wordt al gekalibreerd"
     },

@@ -656,14 +656,6 @@ async def test_stop_cover_calibration_filtering_and_error(hass, gateway):
     assert hub.active_cover is None
 
 
-async def test_cover_async_stop_calibration_method(hass, gateway):
-    """Cover entity method async_stop_calibration delegates to gateway."""
-    cover = _make_cover(hass, gateway)
-    with patch("custom_components.myhome.cover.async_stop_cover_calibration", new_callable=AsyncMock) as mock_stop:
-        await cover.async_stop_calibration()
-        mock_stop.assert_awaited_once_with(hass, gateway_mac=gateway.mac)
-
-
 async def test_reset_travel_time_advanced_and_yaml(hass, gateway):
     """Reset travel time refuses advanced covers and honors YAML config."""
     from custom_components.myhome.const import CONF_PLATFORMS, CONF_TRAVEL_TIME, DOMAIN
@@ -1028,14 +1020,6 @@ async def test_stop_cover_calibration_targets_one_gateway_and_survives_stop_erro
     assert "Error stopping cover" in caplog.text
     with pytest.raises(CalibrationInterrupted):
         await asyncio.wait_for(task, 2)
-
-
-async def test_entity_stop_calibration_service_targets_its_gateway(hass, gateway):
-    """cover.async_stop_calibration forwards the gateway MAC to the stop helper."""
-    cover = _make_cover(hass, gateway)
-    with patch("custom_components.myhome.cover.async_stop_cover_calibration", AsyncMock(return_value=True)) as stop:
-        await cover.async_stop_calibration()
-    stop.assert_awaited_once_with(hass, gateway_mac=gateway.mac)
 
 
 async def test_set_travel_time_one_direction(hass, gateway):
@@ -1473,3 +1457,150 @@ async def test_a_stop_during_the_settle_pause_aborts_the_next_run(hass, gateway)
         await cover._calibration_run("close")
 
     assert gateway.deliveries == []
+
+
+# ── scope covers, double queueing, stop events ───────────────────────────
+
+
+def _make_scope_cover(hass, gateway, where="0"):
+    from custom_components.myhome.cover_scope import CoverScope, MyHOMEScopeCover
+
+    c = MyHOMEScopeCover(
+        hass=hass, name="All shutters", entity_name=None, device_id=where, who="2", where=where,
+        interface=None, advanced=False, manufacturer="BTicino", model="Shutter", gateway=gateway,
+        travel_time=25, scope=CoverScope.of(where),
+    )
+    c.hass = hass
+    c.entity_id = "cover.all_shutters"
+    c.async_write_ha_state = MagicMock()
+    return c
+
+
+async def test_a_scope_cover_refuses_calibration(hass, gateway):
+    """A general/area/group cover moves every actuator and never gets a stop of its own: refuse, send nothing."""
+    cover = _make_scope_cover(hass, gateway)
+    with pytest.raises(HomeAssistantError) as err:
+        await cover.async_calibrate()
+    assert err.value.translation_key == "cover_is_scope"
+    assert gateway.deliveries == []
+
+
+async def test_a_queued_cover_cannot_be_queued_twice(hass, gateway, clock, fake_time, sleeps):
+    a = _make_cover(hass, gateway)
+    b = _make_cover(hass, gateway)
+    b.entity_id = "cover.other"
+    b._device_id = "22"
+    t_a = asyncio.create_task(a.async_calibrate())
+    t_b = asyncio.create_task(b.async_calibrate())
+    await _yield()
+    assert a._calibrating is True and b in a.calibration_hub.queued_covers
+
+    with pytest.raises(HomeAssistantError) as err:
+        await b.async_calibrate()
+    assert err.value.translation_key == "calibration_in_progress"
+
+    t_a.cancel()
+    t_b.cancel()
+    for t in (t_a, t_b):
+        with pytest.raises(asyncio.CancelledError):
+            await t
+
+
+async def test_stopping_a_queued_cover_fires_one_failed_event(hass, gateway, clock, fake_time, sleeps):
+    a = _make_cover(hass, gateway)
+    b = _make_cover(hass, gateway)
+    b.entity_id = "cover.other"
+    b._device_id = "22"
+    events = []
+
+    @callback
+    def _record_event(ev):
+        events.append((ev.data["entity_id"], ev.data["phase"]))
+
+    hass.bus.async_listen(EVENT_COVER_CALIBRATION, _record_event)
+    t_a = asyncio.create_task(a.async_calibrate())
+    t_b = asyncio.create_task(b.async_calibrate())
+    await _yield()
+    _, written = gateway.deliveries[-1]
+    written.set_result(clock.now)
+    await _yield()
+
+    assert await async_stop_cover_calibration(hass, gateway.mac) is True
+    for t in (t_a, t_b):
+        with pytest.raises(CalibrationInterrupted):
+            await asyncio.wait_for(t, 2)
+    await hass.async_block_till_done()
+    assert events.count(("cover.other", "failed")) == 1
+
+
+async def test_calibrate_all_button_skips_scope_covers(hass, gateway):
+    from homeassistant.helpers import entity_registry as er
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.myhome.button import CalibrateAllCoversButtonEntity
+    from custom_components.myhome.const import DOMAIN
+
+    entry = MockConfigEntry(domain=DOMAIN, data={"mac": gateway.mac}, unique_id=gateway.mac)
+    entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    registry.async_get_or_create("cover", DOMAIN, f"{gateway.mac}-2-21", suggested_object_id="a", config_entry=entry)
+    registry.async_get_or_create("cover", DOMAIN, f"{gateway.mac}-2-0", suggested_object_id="general", config_entry=entry)
+    registry.async_get_or_create("cover", DOMAIN, f"{gateway.mac}-2-2", suggested_object_id="area", config_entry=entry)
+    registry.async_get_or_create("cover", DOMAIN, f"{gateway.mac}-2-#1", suggested_object_id="group", config_entry=entry)
+
+    gateway.unique_id = gateway.mac
+    btn = CalibrateAllCoversButtonEntity(hass=hass, config_entry=entry, gateway=gateway)
+    calls = []
+    hass.services.async_register(DOMAIN, "calibrate_cover", lambda call: calls.append(dict(call.data)))
+    await btn.async_press()
+    await hass.async_block_till_done()
+    assert calls == [{"entity_id": ["cover.a"]}]
+
+
+# ── position model: reversal and set_position at the current position ────
+
+
+async def _open_from_closed_to_half(cover, gateway, clock):
+    cover._attr_current_cover_position = 0
+    cover._start_position = 0
+    await cover.async_open_cover()
+    _, written = gateway.deliveries[-1]
+    written.set_result(clock.now)
+    await _yield()
+    clock.now += 0.55
+    cover.handle_event(OWNEvent.parse("*2*1*21##"))  # motor-start echo anchors the run
+    clock.now += 12.5  # half of the 25 s travel
+    assert cover.current_cover_position == 50
+
+
+async def test_a_reversal_mid_run_starts_from_the_current_position(hass, gateway, clock, fake_time):
+    """Closing while opening: the estimate continues from where the cover is, not from the frozen start."""
+    cover = _make_cover(hass, gateway)
+    await _open_from_closed_to_half(cover, gateway, clock)
+
+    await cover.async_close_cover()
+    # Until the close frame is written the cover is shown where it is (50), not back at 0
+    assert cover.current_cover_position == 50 and cover.is_closing
+    _, written = gateway.deliveries[-1]
+    written.set_result(clock.now)
+    await _yield()
+    clock.now += 5.0
+    assert cover.current_cover_position == 30
+
+
+async def test_set_position_at_the_current_position_while_moving_stops(hass, gateway, clock, fake_time, sleeps):
+    """Asking for the position the cover is passing right now stops it there instead of running on."""
+    cover = _make_cover(hass, gateway)
+    await _open_from_closed_to_half(cover, gateway, clock)
+
+    await cover.async_set_cover_position(**{ATTR_POSITION: 50})
+    frame, stop_written = gateway.deliveries[-1]
+    assert frame == "*2*0*21##"
+    stop_written.set_result(clock.now)
+    await _yield()
+    assert cover.current_cover_position == 50 and not cover.is_opening
+
+    # At rest at the target: nothing to send
+    sent = len(gateway.deliveries)
+    await cover.async_set_cover_position(**{ATTR_POSITION: 50})
+    assert len(gateway.deliveries) == sent

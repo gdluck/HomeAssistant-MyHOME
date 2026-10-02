@@ -378,6 +378,9 @@
     "cover_reports_position": {
       "message": "{name} signale sa position ; la calibration du temps de course ne s'y applique pas"
     },
+    "cover_is_scope": {
+      "message": "{name} commande plusieurs volets à la fois ; calibrez chacun d'eux individuellement"
+    },
     "calibration_in_progress": {
       "message": "{name} est déjà en cours de calibration"
     },
