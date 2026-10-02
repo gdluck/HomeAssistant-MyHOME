@@ -903,8 +903,8 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
     def __init__(self, config_entry: ConfigEntry = None):  # type: ignore
         """Initialize MyHome options flow."""
         self._config_entry = config_entry
-        self.options: dict[str, typing.Any] | None = None
-        self.data: dict[str, typing.Any] | None = None
+        self.options = None
+        self.data = None
 
     @property
     def config_entry(self):  # type: ignore
@@ -1002,9 +1002,9 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
         limit_model: str | None = None
 
         if self.options is None:
-            self.options = dict(self.config_entry.options) if self.config_entry else {}
+            self.options = dict(self.config_entry.options) if self.config_entry else {}  # type: ignore
         if self.data is None:
-            self.data = dict(self.config_entry.data) if self.config_entry else {}
+            self.data = dict(self.config_entry.data) if self.config_entry else {}  # type: ignore
 
         if user_input is not None:
             # ── Validate decoder entity IDs ───────────────────────────────
@@ -1069,14 +1069,14 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
                     raw = user_input.get(CONF_SOURCE_DEFAULT_FIELD.format(env), "")
                     if raw not in ("", None, "none"):
                         _defaults[env] = int(raw)
-                self.options[CONF_SOURCE_DEFAULTS] = _defaults
+                self.options[CONF_SOURCE_DEFAULTS] = _defaults  # type: ignore
 
                 # Persist matrix source names (blank = nothing wired to that input)
                 for i in range(1, CONF_SOURCE_SLOTS + 1):
                     name_key = CONF_SOURCE_NAME.format(i)
-                    self.options[name_key] = str(user_input.get(name_key, "") or "").strip()
+                    self.options[name_key] = str(user_input.get(name_key, "") or "").strip()  # type: ignore
                     tuner_key = CONF_SOURCE_TUNER.format(i)
-                    self.options[tuner_key] = bool(user_input.get(tuner_key, False))
+                    self.options[tuner_key] = bool(user_input.get(tuner_key, False))  # type: ignore
 
                 for i in range(1, CONF_DECODER_SLOTS + 1):
                     entity_key = CONF_DECODER_ENTITY.format(i)
@@ -1090,28 +1090,28 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
                         self.options[companion_key] = companion  # type: ignore
                     # Selectors hand back strings/floats; the decoder pool and the
                     # source labels both index on plain ints.
-                    self.options[source_key] = int(user_input.get(source_key, i) or i)
-                    self.options[gain_key] = int(float(user_input.get(gain_key, 0) or 0))
+                    self.options[source_key] = int(user_input.get(source_key, i) or i)  # type: ignore
+                    self.options[gain_key] = int(float(user_input.get(gain_key, 0) or 0))  # type: ignore
 
                 self._apply_topology(user_input, errors)
 
                 _model_update = False
-                if CONF_NAME in user_input and user_input[CONF_NAME] != self.data.get(CONF_NAME):
-                    self.data[CONF_NAME] = user_input[CONF_NAME]
+                if CONF_NAME in user_input and user_input[CONF_NAME] != self.data.get(CONF_NAME):  # type: ignore
+                    self.data[CONF_NAME] = user_input[CONF_NAME]  # type: ignore
                     # An explicit choice is authoritative: drop any earlier WHO=13 label so
                     # the next device-type reply cannot overwrite it (see gateway.py).
-                    self.data["model_source"] = IDENTIFICATION_MANUAL
+                    self.data["model_source"] = IDENTIFICATION_MANUAL  # type: ignore
                     _model_update = True
 
                 _data_update = not (
-                    self.data.get(CONF_HOST) == user_input.get(CONF_ADDRESS)
-                    and self.data.get(CONF_PASSWORD) == user_input.get(CONF_OWN_PASSWORD)
+                    self.data.get(CONF_HOST) == user_input.get(CONF_ADDRESS)  # type: ignore
+                    and self.data.get(CONF_PASSWORD) == user_input.get(CONF_OWN_PASSWORD)  # type: ignore
                 ) or _model_update
-                self.data.update({CONF_HOST: user_input.get(CONF_ADDRESS)})
-                self.data.update({CONF_PASSWORD: user_input.get(CONF_OWN_PASSWORD)})
+                self.data.update({CONF_HOST: user_input.get(CONF_ADDRESS)})  # type: ignore
+                self.data.update({CONF_PASSWORD: user_input.get(CONF_OWN_PASSWORD)})  # type: ignore
 
                 try:
-                    self.data[CONF_HOST] = str(ipaddress.IPv4Address(self.data[CONF_HOST]))
+                    self.data[CONF_HOST] = str(ipaddress.IPv4Address(self.data[CONF_HOST]))  # type: ignore
                 except ipaddress.AddressValueError:
                     errors[CONF_ADDRESS] = "invalid_ip"
 
@@ -1128,16 +1128,16 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
                         if self.config_entry.options == self.options:
                             self.hass.config_entries.async_schedule_reload(self.config_entry.entry_id)
 
-                    return self.async_create_entry(title="", data=self.options)
+                    return self.async_create_entry(title="", data=self.options)  # type: ignore
 
         # ── Build form schema ─────────────────────────────────────────────
         model_options = [m for m in SUPPORTED_GATEWAY_MODELS]
-        current_model = self.data.get(CONF_NAME, "MyHomeServer1")
+        current_model = self.data.get(CONF_NAME, "MyHomeServer1")  # type: ignore
         if current_model not in model_options:
             model_options.insert(0, current_model)
         # An entry that never finished setup since upgrading still stores a count
         # above its gateway's limit; do not offer it back only to reject it.
-        suggested_workers = int(self.options.get(CONF_WORKER_COUNT, 1))
+        suggested_workers = int(self.options.get(CONF_WORKER_COUNT, 1))  # type: ignore
         current_limit = command_session_limit(current_model)
         if current_limit is not None:
             suggested_workers = min(suggested_workers, current_limit)
@@ -1145,7 +1145,7 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
         schema_dict = {
             Required(
                 CONF_ADDRESS,
-                description={"suggested_value": self.data.get(CONF_HOST) or ""},
+                description={"suggested_value": self.data.get(CONF_HOST) or ""},  # type: ignore
             ): str,
             vol.Optional(
                 CONF_NAME,
@@ -1153,7 +1153,7 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
             ): vol.Any(In(model_options), cv.string),
             vol.Optional(
                 CONF_OWN_PASSWORD,
-                description={"suggested_value": self.data.get(CONF_PASSWORD) or ""},
+                description={"suggested_value": self.data.get(CONF_PASSWORD) or ""},  # type: ignore
             ): vol.Maybe(str),
             Required(
                 CONF_WORKER_COUNT,
@@ -1161,17 +1161,17 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
             ): All(Coerce(int), Range(min=1, max=10)),
             Required(
                 CONF_GENERATE_EVENTS,
-                description={"suggested_value": self.options.get(CONF_GENERATE_EVENTS, False)},
+                description={"suggested_value": self.options.get(CONF_GENERATE_EVENTS, False)},  # type: ignore
             ): bool,
             vol.Optional(
                 CONF_BROADCAST_RESYNC,
-                description={"suggested_value": self.options.get(CONF_BROADCAST_RESYNC, True)},
+                description={"suggested_value": self.options.get(CONF_BROADCAST_RESYNC, True)},  # type: ignore
                 default=True,
             ): bool,
             vol.Optional(
                 CONF_TRANSITION_MODE,
                 description={
-                    "suggested_value": self.options.get(CONF_TRANSITION_MODE, DEFAULT_TRANSITION_MODE)
+                    "suggested_value": self.options.get(CONF_TRANSITION_MODE, DEFAULT_TRANSITION_MODE)  # type: ignore
                 },
             ): selector.SelectSelector(
                 selector.SelectSelectorConfig(
@@ -1198,7 +1198,7 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
         _source_names: dict[int, str] = {}
         for i in range(1, CONF_SOURCE_SLOTS + 1):
             name_key = CONF_SOURCE_NAME.format(i)
-            _name = str(self.options.get(name_key, "") or "").strip()
+            _name = str(self.options.get(name_key, "") or "").strip()  # type: ignore
             if _name:
                 _source_names[i] = _name
             schema_dict[vol.Optional(
@@ -1211,11 +1211,11 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
             tuner_key = CONF_SOURCE_TUNER.format(i)
             schema_dict[vol.Required(
                 tuner_key,
-                default=bool(self.options.get(tuner_key, False)),
+                default=bool(self.options.get(tuner_key, False)),  # type: ignore
             )] = selector.BooleanSelector()
 
         # Default source per environment — only for environments that have zones.
-        _stored_defaults = self.options.get(CONF_SOURCE_DEFAULTS) or {}
+        _stored_defaults = self.options.get(CONF_SOURCE_DEFAULTS) or {}  # type: ignore
         for env in self._audio_environments():
             field = CONF_SOURCE_DEFAULT_FIELD.format(env)
             _current = _stored_defaults.get(env) if isinstance(_stored_defaults, dict) else None
@@ -1261,7 +1261,7 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
             source_key = CONF_DECODER_SOURCE.format(i)
             gain_key = CONF_DECODER_PRE_GAIN.format(i)
 
-            _entity_val = self.options.get(entity_key, "")
+            _entity_val = self.options.get(entity_key, "")  # type: ignore
             if _entity_val:
                 schema_dict[vol.Optional(
                     entity_key,
@@ -1289,7 +1289,7 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
             )
             schema_dict[vol.Required(
                 gain_key,
-                default=int(self.options.get(gain_key, 0) or 0),
+                default=int(self.options.get(gain_key, 0) or 0),  # type: ignore
             )] = selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=0, max=100, step=1,

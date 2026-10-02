@@ -282,10 +282,6 @@ async def async_setup_entry(
             # the registry entry and create a duplicate.
             sensor._attr_unique_id = ctx.registry_entry.unique_id
         sensor.entity_id = entity_id_of(ctx)  # type: ignore[assignment]
-        if ctx.registry_entry is not None:
-            # yaml-era ids are `{mac}-1-{where}-illuminance`; a rebuilt id would
-            # orphan the registry entry and create a `_2` duplicate.
-            sensor._attr_unique_id = ctx.registry_entry.unique_id
         return sensor
 
     # ── WHO 4: temperature probes ───────────────────────────────────────
@@ -749,7 +745,6 @@ class MyHOMETemperatureSensor(MyHOMEEntity, SensorEntity):
     def handle_event(self, message: OWNHeatingEvent) -> None:
         """Handle an event message."""
         val = None
-        dim_raw = getattr(message, "dimension_value", None) or getattr(message, "_dimension_value", None) or []
         if message.message_type == MESSAGE_TYPE_MAIN_TEMPERATURE:
             val = signed_who4_temperature(message, message.main_temperature)
         elif message.message_type == MESSAGE_TYPE_SECONDARY_TEMPERATURE:

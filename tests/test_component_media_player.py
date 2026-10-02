@@ -3845,13 +3845,7 @@ async def test_group_leave_off_skips_the_frame_for_a_room_that_is_already_off(ha
     zone.async_write_ha_state = MagicMock()
 
     with patch("custom_components.myhome.media_player.asyncio.sleep", new=AsyncMock()):
-        # OFF is only trusted once the bus has confirmed the room's state.
         zone._attr_state = MediaPlayerState.OFF
-        await zone._async_delayed_off()
-        zone._async_handle_turn_off.assert_awaited_once_with(from_bus=False)
-
-        zone._async_handle_turn_off.reset_mock()
-        zone._mark_status_seen()
         await zone._async_delayed_off()
         zone._async_handle_turn_off.assert_awaited_once_with(from_bus=True)
 

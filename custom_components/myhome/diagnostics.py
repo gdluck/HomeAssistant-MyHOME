@@ -39,8 +39,6 @@ from .data import MyHOMERuntimeData, get_runtime_data
 # slot, is the exception: it becomes ``media_player.decoder_<slot>`` so the
 # slot -> source / gain mapping stays readable without the room it is named
 # after.
-REDACTED = "**REDACTED**"
-
 TO_REDACT = {
     CONF_PASSWORD,
     "password",

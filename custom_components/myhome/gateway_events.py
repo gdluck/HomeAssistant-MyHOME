@@ -45,17 +45,6 @@ if TYPE_CHECKING:
     from .gateway import MyHOMEGatewayHandler
 
 
-def _is_sensor_frame(message: Any) -> bool:
-    """Motion / illuminance / PIR frames on WHO 1 are not actuator status (mirrors light.py)."""
-    return (
-        getattr(message, "is_sensor", False) is True
-        or getattr(message, "motion", False) is True
-        or isinstance(getattr(message, "illuminance", None), int)
-        or getattr(message, "dimension", None) in (5, 6, 7)
-        or getattr(message, "_state", None) == 34
-    )
-
-
 class GatewayEventDispatcher:
     """Dispatches bus and integration events from gateway monitor frames."""
 
