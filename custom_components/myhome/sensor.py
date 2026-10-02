@@ -529,8 +529,8 @@ class MyHOMEPowerSensor(MyHOMEEntity, SensorEntity):
         self._publish_state()
         return None
 
-    async def start_sending_instant_power(self, duration: int) -> None:
-        """Request automatic instant power."""
+    async def start_sending_instant_power(self, duration: int = 65) -> None:
+        """Request automatic instant power for ``duration`` minutes (OWNd's default is 65)."""
         if duration > 0:
             self._streaming_until = time.monotonic() + (duration * 60)
         else:
