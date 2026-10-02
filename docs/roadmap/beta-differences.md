@@ -11,7 +11,7 @@ The table below outlines feature availability, gateway support, and protocol cap
 | Feature / Subsystem | v2.0.0b1 – b4 | v2.0.0b5 – b8 | v2.0.0b9 – b10 | v2.0.0b11 | v2.0.0b13 | v2.0.0b14 (Latest) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Protocol Engine (`OWNd`)** | Embedded `0.7.48` | `2.0.0b5` (PyPI) | `2.0.0b5` (PyPI) | `2.0.0b6` (PyPI) | `2.0.0b8` (HMAC refactor) | `2.0.0b8` (HMAC refactor) |
-| **Command Worker Concurrency** | Static (1 worker) | Static (1 worker) | Static (1 worker) | Dynamic (1–4) | Dynamic (1–4, model-capped) | Dynamic (1–4, model-capped) |
+| **Command Worker Concurrency** | Static (1 worker) | Static (1 worker) | Static (1 worker) | Dynamic (1–4) | Dynamic (1–10, model-capped) | Dynamic (1–10, model-capped) |
 | **Gateway In-Place Reconfiguration** | ❌ Delete & Re-add | ❌ Delete & Re-add | ❌ Delete & Re-add | ❌ Delete & Re-add | ✅ IP, Password, Model in Options | ✅ IP, Password, Model in Options |
 | **Dimmer Transitions** | `software_stepped` | `software_stepped` | `software_stepped` (shielded) | `software_stepped` / `native` | `software_stepped` / `native` | `software_stepped` / `native` |
 | **Command Translation (`WHAT=1000`)** | State flicker | State flicker | ✅ Filtered / Preserved | ✅ Filtered / Preserved | ✅ Filtered / Preserved | ✅ Filtered / Preserved |
@@ -19,7 +19,7 @@ The table below outlines feature availability, gateway support, and protocol cap
 | **Thermoregulation (`WHO = 4`)** | Basic zones | Basic zones | Basic zones | Central Units 3550 / 4695 | Fan mode restore (#404) | Climate zone state & sweep (#457) |
 | **Cover Concurrency Isolation** | Standard | Standard | Standard | Dedicated queue | Dedicated queue | Full run-stop lock (#433) |
 | **Sound System (`WHO = 16 / 22`)** | ❌ | Basic Matrix | Basic Matrix | Volume normalization & Proxy | Dynamic Proxy Decoders | FM Tuner stepping + Matrix names |
-| **CEN / CEN+ Triggers (`WHO = 15/25`)** | Basic events | Basic events | Duplicate ID fix (#247) | UI Device Triggers (all 8 actions) | Long-press repeat debouncing | Centralized control triggers (#466) |
+| **CEN / CEN+ Triggers (`WHO = 15/25`)** | Basic events | Basic events | Duplicate ID fix (#247) | UI Device Triggers (all 9 actions) | Long-press repeat debouncing | Centralized control triggers (#466) |
 | **Lovelace Bus Monitor Card** | ❌ CLI only | ✅ In-band card | Scoped registry fix (#277) | Export trace / Report issue | Filter & style refinements | Offline bus replay tab |
 | **Trace Replay CI Engine** | ❌ Unit tests only | ❌ Unit tests only | Golden frame checks | ✅ Synthetic plant fixtures | Plant #247 & MH200 fixtures | Multi-plant matrix (F454, MH202, H4890) |
 | **Test Suite Statements Covered** | ~850 tests | 984 tests (100%) | 1,140 tests (100%) | 1,294 tests (100%) | 1,320 tests (100%) | 1,350+ tests (100%) |
@@ -86,7 +86,7 @@ The table below outlines feature availability, gateway support, and protocol cap
 - **Key Enhancements**:
   - **Scoped Registry Self-Healing (#277)**: Dynamic getter and 45-second watchdog interval restoring `<myhome-bus-card>` elements if overwritten by polyfills (such as `scheduler-card`).
   - **Lovelace Card Picker Integration**: Implemented `getStubConfig()` and `getConfigForm()` for native visual card configuration in Home Assistant dashboards.
-  - **Dual-Route Static Serving**: Registered both `/myhome_static` and automatic sync to `/config/www/` for fail-safe frontend loading.
+  - **Dual-Route Static Serving**: The card is served from `/myhome_static/myhome-bus-card.js` (registered at setup); no copy is written to `/config/www/`.
 
 ---
 

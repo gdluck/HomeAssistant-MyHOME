@@ -29,7 +29,7 @@ Sends an arbitrary, valid OpenWebNet message through the gateway command session
 ### Fields
 | Parameter | Type | Required | Description | Example |
 | :--- | :---: | :---: | :--- | :--- |
-| `gateway` | string | **Yes** | The MAC address of the target gateway. | `"00:03:50:20:00:01"` |
+| `gateway` | string | No | The MAC address of the target gateway; defaults to the primary gateway. | `"00:03:50:20:00:01"` |
 | `message` | string | **Yes** | Valid OpenWebNet frame ending with `##`. | `"*1*0*0##"` |
 
 ### Example YAML Call
@@ -100,7 +100,7 @@ By default, MyHOME energy meters (F520, F521, F522, F523) transmit energy readin
 | Parameter | Type | Required | Description | Example |
 | :--- | :---: | :---: | :--- | :--- |
 | `entity_id` | string | **Yes** | The power sensor entity ID. | `"sensor.general_power"` |
-| `duration` | integer | **Yes** | Duration in seconds to keep streaming. | `60` |
+| `duration` | integer | **Yes** | Duration in **minutes** (1–255) to keep streaming. | `60` |
 
 ### Example YAML Call
 ```yaml

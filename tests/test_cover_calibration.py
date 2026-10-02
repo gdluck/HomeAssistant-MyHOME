@@ -1462,3 +1462,14 @@ async def test_concurrent_two_gateway_async_calibrate(hass):
     assert await async_stop_cover_calibration(hass, gateway_mac=gw_a.mac) is False
 
 
+
+
+async def test_a_stop_during_the_settle_pause_aborts_the_next_run(hass, gateway):
+    """The stop flag set between two runs must not be reset by the next run's start."""
+    cover = _make_cover(hass, gateway)
+    cover._calibration_interrupted = "Calibration stopped by user"
+
+    with pytest.raises(CalibrationInterrupted):
+        await cover._calibration_run("close")
+
+    assert gateway.deliveries == []

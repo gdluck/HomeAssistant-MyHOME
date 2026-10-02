@@ -11,12 +11,12 @@ BTicino / Legrand pushbuttons operate in either **CEN** (`WHO = 15`) or **CEN+**
 | Feature | **CEN (`WHO = 15`)** | **CEN+ (`WHO = 25`)** |
 | :--- | :--- | :--- |
 | **Typical Hardware** | L/N/NT4652, 067552, F420 | L/N/NT4652/2, 067554, 3477 (Dry Contacts), F428 |
-| **Buttons per Device** | 1 to 32 | 0 to 255 |
+| **Buttons per Device** | 0 to 31 | 0 to 31 (device triggers; the bus itself allows 0–255) |
 | **Addressing Syntax** | `*15*<WHAT>*<WHERE>#<BUTTON>##` | `*25*<WHAT>#<BUTTON>*<WHERE>##` |
 | **Short Press Event** | `WHAT = 1` | `WHAT = 21` |
 | **Start Long Press** | `WHAT = 0` | `WHAT = 22` |
 | **Release Long Press** | `WHAT = 2` | `WHAT = 24` |
-| **Rotary Dials** | Supported via vendor extensions | Supported (CW/CCW slow & fast) |
+| **Rotary Dials** | Not available (WHO 15 has no rotary frames) | Supported (CW/CCW slow & fast) |
 | **Dry Contact Status** | N/A | `WHAT = 31` (Closed), `WHAT = 32` (Opened) |
 
 ---

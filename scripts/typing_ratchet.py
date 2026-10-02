@@ -38,11 +38,20 @@ def run_mypy() -> tuple[Counter[str], str]:
         text=True,
         encoding="utf-8",
     )
+    # mypy exits 0 (clean) or 1 (type errors found); anything else means it did not
+    # run (missing module, crashed, bad config) and an empty error list would be a
+    # false "0 errors".
+    if proc.returncode not in (0, 1):
+        raise RuntimeError(
+            f"mypy did not run (exit {proc.returncode}):\n{proc.stderr.strip() or proc.stdout.strip()}"
+        )
     counts: Counter[str] = Counter()
     for line in proc.stdout.splitlines():
         match = ERROR_LINE.match(line.replace("\\", "/"))
         if match:
             counts[match.group("module")] += 1
+    if proc.returncode == 1 and not counts:
+        raise RuntimeError(f"mypy reported errors that could not be parsed:\n{proc.stdout.strip()}")
     return counts, proc.stdout
 
 

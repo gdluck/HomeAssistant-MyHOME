@@ -23,7 +23,7 @@ Before adding the integration to Home Assistant, ensure:
 In v2, gateway setup is **100% UI-first**:
 
 1. In Home Assistant, navigate to **Settings → Devices & Services**.
-2. If your gateway is discovered automatically via SSDP or mDNS, click **Configure** on the discovery card.
+2. If your gateway is discovered automatically via SSDP, click **Configure** on the discovery card.
 3. If adding manually:
    - Click **Add Integration** in the bottom right corner.
    - Search for **MyHOME** and select it.
@@ -53,7 +53,7 @@ Once connected:
 Fine-tune runtime parameters by clicking **Configure** on the MyHOME integration card:
 
 * **Command Worker Concurrency**: Number of asynchronous command workers (default: `1`). Increase to `2`–`4` for high-throughput multi-session gateways like F454 or MHS1.
-* **Dimmer Transition Mode**: Choose between `software_stepped` (smooth 100-step software stepping managed by Home Assistant) and `native` (actuator hardware fade ramp).
+* **Dimmer Transition Mode**: Choose between `software_stepped` (up to 25 brightness steps about 0.3 s apart, driven by Home Assistant) and `native` (actuator hardware fade ramp).
 * **Event Bus Broadcasting**: Toggle whether raw bus frames are emitted as `myhome_message_event` events to Home Assistant for custom event automations.
 * **Dynamic Proxy Decoders**: Map network audio decoders (Music Assistant, Squeezelite) to physical F441 matrix source inputs for Diffusione Sonora.
 

@@ -506,7 +506,7 @@ class MyHOMEMediaPlayer(ZoneGroupLayer):
         await self._async_wake_zone()
         self.async_write_ha_state()
         sent: set[str] = set()
-        if route:
+        if route and source_num is not None:
             await self._route_to(source_num, sent)
 
         # If this zone is a group leader, wake and route the members too. The
@@ -718,6 +718,9 @@ class MyHOMEMediaPlayer(ZoneGroupLayer):
                             except Exception:
                                 pass
                             member_ent._attr_state = MediaPlayerState.OFF
+                            member_ent._parked = False  # the group is gone: no parked state to report
+                            member_ent._wake_pending = False
+                            member_ent._cancel_pending_off()
                             member_ent.async_write_ha_state()
                     await pool.release(self.entity_id)
                 else:

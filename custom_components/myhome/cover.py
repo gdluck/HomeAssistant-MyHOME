@@ -588,6 +588,9 @@ class MyHOMECover(MyHOMEEntity, CoverEntity):
 
     async def _calibration_run(self, direction: str) -> float:
         """Drive one full run and return its measured duration (motor start -> actuator stop)."""
+        if self._calibration_interrupted:
+            # A stop that landed in the settle pause between two runs.
+            raise CalibrationInterrupted(self._display_name, self._calibration_interrupted)
         self._stopped_event = asyncio.Event()
         self._calibration_interrupted = None
         self._fire_calibration_event("run", direction=direction)
