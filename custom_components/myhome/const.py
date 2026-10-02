@@ -509,7 +509,9 @@ def build_timed_turn_on_command(
     total_seconds = float(duration if duration is not None else 0.0)
     total_seconds += (int(hours) * 3600) + (int(minutes) * 60) + float(seconds)
 
-    if total_seconds <= 0:
+    if total_seconds < 0.5:
+        # The shortest timer the protocol has is WHAT 18 (0.5 s); anything below
+        # it would otherwise round to a 0 h 0 m 0 s dimension-2 temporization.
         total_seconds = 0.5
 
     rounded_secs = round(total_seconds, 1)

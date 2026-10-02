@@ -659,6 +659,33 @@ async def test_native_transition_optimistic_state_update(hass):
     light.async_schedule_update_ha_state.assert_called_once()
 
 
+async def test_native_transition_longer_than_the_speed_field_saturates(hass):
+    """The protocol's speed field is 0..255; OWNd drops anything beyond it to "no fade"."""
+    gateway = MagicMock()
+    gateway.send = AsyncMock()
+    cfg = MagicMock()
+    cfg.options = {CONF_TRANSITION_MODE: TRANSITION_MODE_NATIVE}
+    gateway.config_entry = cfg
+    light = MyHOMELight(
+        hass=hass, name="L", entity_name="L", icon="mdi:lightbulb-off", icon_on="mdi:lightbulb-on",
+        device_id="24", who="1", where="24", interface=None, dimmable=True,
+        manufacturer="B", model="M", gateway=gateway
+    )
+    light.hass = hass
+    light.async_schedule_update_ha_state = MagicMock()
+    light._attr_is_on = False
+
+    await light.async_turn_on(**{ATTR_BRIGHTNESS_PCT: 50, ATTR_TRANSITION: 300})
+    assert str(gateway.send.call_args[0][0]) == "*#1*24*#1*150*255##"
+
+    await light.async_turn_on(**{ATTR_TRANSITION: 300})
+    assert str(gateway.send.call_args[0][0]) == "*1*1#255*24##"
+
+    light._attr_is_on = True
+    await light.async_turn_off(**{ATTR_TRANSITION: 300})
+    assert str(gateway.send.call_args[0][0]) == "*1*0#255*24##"
+
+
 async def test_software_stepped_multi_worker_warning(hass, caplog):
     """Test warning logged when command_worker_count > 1 with software stepped transitions."""
     gateway = MagicMock()
@@ -1599,6 +1626,13 @@ async def test_dali_rgb_turn_on_commands(hass):
     mock_gateway.send.assert_called_once()
     sent_cmd = mock_gateway.send.call_args[0][0]
     assert sent_cmd._raw == "*#1*25#4#02*#12*100*40*100##"
+
+    # brightness 1 of 255 is "on at minimum", not value 0
+    mock_gateway.send.reset_mock()
+    await light.async_turn_on(hs_color=(255.0, 100.0), brightness=1)
+    sent_cmd = mock_gateway.send.call_args[0][0]
+    assert sent_cmd._raw == "*#1*25#4#02*#12*255*100*1##"
+    assert light.is_on is True
 
     # Test async_update queries both brightness and HSV color
     mock_gateway.send_status_request.reset_mock()

@@ -8,6 +8,7 @@ from homeassistant.const import CONF_NAME, STATE_ON, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from OWNd.message import OWNMessage
 from voluptuous.error import Invalid
 
@@ -389,6 +390,68 @@ async def test_bus_frame_wrong_group_ignored(hass: HomeAssistant):
 
     _fire(group, "*1*1*#7##")
     assert group.is_on is None
+
+
+async def test_brightness_one_is_on_at_minimum(hass: HomeAssistant):
+    """brightness 1 of 255 rounds to 0 %, which the bus reads as OFF; send level 1."""
+    gateway = _gateway()
+    group = _group(hass, gateway)
+    await group.async_added_to_hass()
+
+    await group.async_turn_on(**{ATTR_BRIGHTNESS: 1})
+    assert str(gateway.send.call_args[0][0]) == "*#1*#6*#1*101*0##"
+    assert group.is_on is True
+
+    gateway.send.reset_mock()
+    await group.async_turn_on(**{ATTR_HS_COLOR: (120.0, 50.0), ATTR_BRIGHTNESS: 1})
+    assert str(gateway.send.call_args[0][0]) == "*#1*#6*#12*120*50*1##"
+
+
+async def test_group_frames_from_the_bus_reach_the_group_entity(hass: HomeAssistant):
+    """Discovery drops group/area frames unless the platform routes them (#368)."""
+    from homeassistant.util.yaml.loader import parse_yaml
+
+    validated = config_schema(parse_yaml(
+        f"""
+{MAC}:
+  light:
+    group_6:
+      where: '#6'
+      name: Kitchen Group
+      dimmable: true
+"""
+    ))
+    lights = validated[MAC]["platforms"]["light"]
+    config_entry = MagicMock()
+    config_entry.data = {"mac": MAC}
+    config_entry.entry_id = "test_entry"
+    gateway = _gateway()
+    hass.data = {DOMAIN: {MAC: {"entity": gateway, "platforms": {"light": lights}}}}
+
+    with (
+        patch("custom_components.myhome.discovery.er.async_entries_for_config_entry", return_value=[]),
+        patch("custom_components.myhome.discovery.er.async_get", return_value=MagicMock()),
+    ):
+        async_add_entities = MagicMock()
+        attach_runtime(hass, config_entry)
+        await async_setup_entry(hass, config_entry, async_add_entities)
+    group = list(async_add_entities.call_args[0][0])[0]
+    assert isinstance(group, MyHOMELightGroup)
+    assert group.is_on is None
+
+    async_dispatcher_send(hass, f"myhome_message_{MAC}", OWNMessage.parse("*1*1*#6##"))
+    await hass.async_block_till_done()
+    assert group.is_on is True
+
+    async_dispatcher_send(hass, f"myhome_message_{MAC}", OWNMessage.parse("*#1*#6*1*150*0##"))
+    await hass.async_block_till_done()
+    assert group.brightness == 128
+
+    # another group's frame and an area frame leave it alone
+    async_dispatcher_send(hass, f"myhome_message_{MAC}", OWNMessage.parse("*1*0*#7##"))
+    async_dispatcher_send(hass, f"myhome_message_{MAC}", OWNMessage.parse("*1*0*6##"))
+    await hass.async_block_till_done()
+    assert group.is_on is True
 
 
 # ── membership mode ─────────────────────────────────────────────────────

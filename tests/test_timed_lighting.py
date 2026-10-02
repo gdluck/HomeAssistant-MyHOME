@@ -3,7 +3,7 @@
 Verifies build_timed_turn_on_command, MyHOMELight.async_turn_on_timed,
 MyHOMESwitch.async_turn_on_timed, and kwarg interception in async_turn_on.
 """
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -13,10 +13,7 @@ from custom_components.myhome.const import (
     build_timed_turn_on_command,
 )
 from custom_components.myhome.light import MyHOMELight
-from custom_components.myhome.light import async_setup_entry as async_setup_light_entry
 from custom_components.myhome.switch import MyHOMESwitch
-from custom_components.myhome.switch import async_setup_entry as async_setup_switch_entry
-from tests.conftest import attach_runtime
 
 # ── 1. build_timed_turn_on_command Tests ─────────────────────────────────────
 
@@ -58,6 +55,11 @@ class TestBuildTimedTurnOnCommand:
         # Compound arguments: hours=2, minutes=15, seconds=30
         cmd_compound = build_timed_turn_on_command("21", hours=2, minutes=15, seconds=30)
         assert str(cmd_compound) == "*#1*21*#2*2*15*30##"
+
+    def test_durations_below_the_shortest_preset_use_it(self):
+        """0 < duration < 0.5 s must not become a 0 h 0 m 0 s dimension-2 timer."""
+        assert str(build_timed_turn_on_command("11", duration=0.3)) == "*1*18*11##"
+        assert str(build_timed_turn_on_command("11", seconds=0.2)) == "*1*18*11##"
 
     def test_zero_and_negative_duration_defaults_to_half_second(self):
         """Zero or negative duration should safely fall back to 0.5s pulse."""
@@ -190,6 +192,13 @@ class TestLightTimedTurnOn:
         assert str(second_cmd) == "*1*17*21##"
         assert dimmable_light.is_on is True
 
+    async def test_async_turn_on_timed_brightness_one_is_on_at_minimum(self, dimmable_light, mock_gateway):
+        """brightness 1 of 255 rounds to 0 % but means "on at minimum", not "no level"."""
+        await dimmable_light.async_turn_on_timed(duration=120, brightness=1)
+
+        frames = [str(call[0][0]) for call in mock_gateway.send.call_args_list]
+        assert frames == ["*#1*21*#1*101*0##", "*1*12*21##"]
+
     async def test_async_turn_on_timed_non_dimmable_ignores_brightness(self, non_dimmable_light, mock_gateway):
         """Non-dimmable light ignores brightness parameters and only sends timed command."""
         await non_dimmable_light.async_turn_on_timed(duration=60, brightness=200)
@@ -273,6 +282,13 @@ class TestSwitchTimedTurnOn:
         assert str(sent_cmd) == "*1*16*31##"
         assert test_switch.is_on is True
 
+    async def test_switch_async_turn_on_timed_accepts_and_ignores_brightness(self, test_switch, mock_gateway):
+        """The service schema is shared with lights; a relay takes the fields and sends no level."""
+        await test_switch.async_turn_on_timed(duration=60, brightness=200, brightness_pct=50)
+
+        mock_gateway.send.assert_called_once()
+        assert str(mock_gateway.send.call_args[0][0]) == "*1*11*31##"
+
     async def test_switch_async_turn_on_timed_custom(self, test_switch, mock_gateway):
         """Test direct async_turn_on_timed on switch with custom time."""
         await test_switch.async_turn_on_timed(hours=1, minutes=30, seconds=0)
@@ -311,55 +327,69 @@ class TestSwitchTimedTurnOn:
 
 # ── 4. Service Registration Verification ─────────────────────────────────────
 
-class TestPlatformServiceRegistration:
-    """Test registration of turn_on_timed service in light and switch platforms."""
+class TestServiceRegistration:
+    """myhome.turn_on_timed is one service for both the light and the switch entities."""
 
-    async def test_light_registers_turn_on_timed(self, hass):
-        from homeassistant.helpers import entity_platform
+    @staticmethod
+    def _gateway():
+        gateway = MagicMock()
+        gateway.mac = "AA:BB:CC:DD:EE:FF"
+        gateway.send = AsyncMock()
+        gateway.send_status_request = AsyncMock()
+        gateway.availability_signal = "myhome_avail"
+        gateway.available = True
+        return gateway
 
-        mock_gateway = MagicMock()
-        mock_gateway.mac = "AA:BB:CC:DD:EE:FF"
-        hass.data = {DOMAIN: {mock_gateway.mac: {"entity": mock_gateway}}}
+    @staticmethod
+    def _register(hass, domain, entity):
+        """Put an entity where EntityPlatform would: the per-domain platform map."""
+        from homeassistant.helpers.entity_platform import DATA_DOMAIN_PLATFORM_ENTITIES
 
-        config_entry = MagicMock()
-        config_entry.data = {"mac": mock_gateway.mac}
-        config_entry.entry_id = "test_light_entry"
+        entity.hass = hass
+        entity.entity_id = f"{domain}.{entity._where}"
+        entity.async_write_ha_state = MagicMock()
+        hass.data.setdefault(DATA_DOMAIN_PLATFORM_ENTITIES, {}).setdefault((domain, DOMAIN), {})[entity.entity_id] = entity
 
-        mock_platform = MagicMock()
-        token = entity_platform.current_platform.set(mock_platform)
-        try:
-            with patch("custom_components.myhome.discovery.er.async_entries_for_config_entry", return_value=[]), \
-                 patch("custom_components.myhome.discovery.er.async_get", return_value=MagicMock()):
-                attach_runtime(hass, config_entry)
-                await async_setup_light_entry(hass, config_entry, MagicMock())
+    async def test_schema_accepts_the_documented_brightness_fields(self, hass):
+        from custom_components.myhome.services import async_setup_services
 
-            mock_platform.async_register_entity_service.assert_called_once()
-            service_name = mock_platform.async_register_entity_service.call_args[0][0]
-            assert service_name == SERVICE_TURN_ON_TIMED
-        finally:
-            entity_platform.current_platform.reset(token)
+        await async_setup_services(hass)
+        assert hass.services.has_service(DOMAIN, SERVICE_TURN_ON_TIMED)
+        schema = hass.services.async_services_for_domain(DOMAIN)[SERVICE_TURN_ON_TIMED].schema
+        assert schema({"entity_id": "light.x", "duration": 120, "brightness_pct": 70})["brightness_pct"] == 70
+        assert schema({"entity_id": "light.x", "minutes": 3, "seconds": 30, "brightness": 255})["brightness"] == 255
 
-    async def test_switch_registers_turn_on_timed(self, hass):
-        from homeassistant.helpers import entity_platform
+    async def test_service_reaches_lights_and_switches(self, hass):
+        """A per-platform registration only ever bound one domain; the other target was a silent no-op."""
+        from custom_components.myhome.services import async_setup_services
 
-        mock_gateway = MagicMock()
-        mock_gateway.mac = "AA:BB:CC:DD:EE:FF"
-        hass.data = {DOMAIN: {mock_gateway.mac: {"entity": mock_gateway, "platforms": {"switch": {}}}}}
+        gateway = self._gateway()
+        light = MyHOMELight(
+            hass=hass, name="Hall", entity_name=None, icon=None, icon_on=None, device_id="12", who="1",
+            where="12", interface=None, dimmable=True, manufacturer="BTicino", model="Dimmer", gateway=gateway,
+        )
+        switch = MyHOMESwitch(
+            hass=hass, name="Socket", entity_name=None, icon=None, icon_on=None, device_id="22", who="1",
+            where="22", interface=None, device_class="switch", manufacturer="BTicino", model="F411/2", gateway=gateway,
+        )
+        self._register(hass, "light", light)
+        self._register(hass, "switch", switch)
+        await async_setup_services(hass)
 
-        config_entry = MagicMock()
-        config_entry.data = {"mac": mock_gateway.mac}
-        config_entry.entry_id = "test_switch_entry"
+        await hass.services.async_call(
+            DOMAIN, SERVICE_TURN_ON_TIMED, {"entity_id": "switch.22", "duration": 1800}, blocking=True
+        )
+        assert [str(c.args[0]) for c in gateway.send.call_args_list] == ["*#1*22*#2*0*30*0##"]
 
-        mock_platform = MagicMock()
-        token = entity_platform.current_platform.set(mock_platform)
-        try:
-            with patch("custom_components.myhome.discovery.er.async_entries_for_config_entry", return_value=[]), \
-                 patch("custom_components.myhome.discovery.er.async_get", return_value=MagicMock()):
-                attach_runtime(hass, config_entry)
-                await async_setup_switch_entry(hass, config_entry, MagicMock())
+        gateway.send.reset_mock()
+        await hass.services.async_call(
+            DOMAIN, SERVICE_TURN_ON_TIMED, {"entity_id": "light.12", "duration": 120, "brightness_pct": 70}, blocking=True
+        )
+        assert [str(c.args[0]) for c in gateway.send.call_args_list] == ["*#1*12*#1*170*0##", "*1*12*12##"]
 
-            mock_platform.async_register_entity_service.assert_called_once()
-            service_name = mock_platform.async_register_entity_service.call_args[0][0]
-            assert service_name == SERVICE_TURN_ON_TIMED
-        finally:
-            entity_platform.current_platform.reset(token)
+        # a switch takes the brightness fields and sends no level
+        gateway.send.reset_mock()
+        await hass.services.async_call(
+            DOMAIN, SERVICE_TURN_ON_TIMED, {"entity_id": "switch.22", "duration": 60, "brightness": 200}, blocking=True
+        )
+        assert [str(c.args[0]) for c in gateway.send.call_args_list] == ["*1*11*22##"]

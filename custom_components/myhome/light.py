@@ -3,7 +3,6 @@
 import asyncio
 from typing import Any, cast
 
-import voluptuous as vol
 from homeassistant.components.light import (  # type: ignore[attr-defined, unused-ignore]
     ATTR_BRIGHTNESS,
     ATTR_BRIGHTNESS_PCT,
@@ -28,7 +27,6 @@ from homeassistant.const import (
     CONF_NAME,
 )
 from homeassistant.core import HomeAssistant, State, callback
-from homeassistant.helpers import entity_platform
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util.color import (
@@ -59,7 +57,6 @@ from .const import (
     CONF_WORKER_COUNT,
     DEFAULT_TRANSITION_MODE,
     LOGGER,
-    SERVICE_TURN_ON_TIMED,
     TRANSITION_MODE_AUTO,
     TRANSITION_MODE_NATIVE,
     TRANSITION_MODE_SOFTWARE,
@@ -75,7 +72,6 @@ from .light_dali import DaliFeatureLock
 from .light_fade import SoftwareFadeEngine
 from .light_group import MyHOMELightGroup, _color_modes_from_flags
 from .myhome_device import MyHOMEEntity
-from .typing_compat import as_any
 
 PARALLEL_UPDATES = 0
 
@@ -195,6 +191,17 @@ async def async_setup_entry(
             return True
         return False
 
+    @callback
+    def route_scope(message: Any, address: Address) -> None:
+        """A group frame is the declared group's own status (#368).
+
+        Discovery never creates entities for group or area addresses, so these
+        frames are only published to the group entity listening under its key;
+        area frames have no entity and are left to the members' re-sync sweep.
+        """
+        if getattr(message, "is_group", False) is True:
+            runtime.router.publish("1", (address.key, address.clean_key), message)
+
     PlatformDiscovery(
         hass,
         config_entry,
@@ -207,26 +214,10 @@ async def async_setup_entry(
         reject_registry_entry=ghost,
         accept=accept,
         pre_message=route_foreign,
+        on_scope=route_scope,
     ).start()
 
-    platform = entity_platform.current_platform.get()
-    if platform is not None:
-        platform.async_register_entity_service(
-            SERVICE_TURN_ON_TIMED,
-            as_any({
-                vol.Optional("duration"): vol.Coerce(float),
-                vol.Optional("hours", default=0): vol.All(
-                    vol.Coerce(int), vol.Range(min=0, max=255)
-                ),
-                vol.Optional("minutes", default=0): vol.All(
-                    vol.Coerce(int), vol.Range(min=0, max=59)
-                ),
-                vol.Optional("seconds", default=0): vol.All(
-                    vol.Coerce(float), vol.Range(min=0, max=59)
-                ),
-            }),
-            "async_turn_on_timed",
-        )
+    # myhome.turn_on_timed is registered once for lights and switches in services.py.
 
 
 class _ForeignAddresses:
@@ -671,7 +662,8 @@ class MyHOMELight(MyHOMEEntity, LightEntity):
         if brightness_pct is not None:
             target_pct = brightness_pct
         elif brightness is not None:
-            target_pct = eight_bits_to_percent(brightness)
+            # brightness 1..2 of 255 is "on at minimum", not 0 %
+            target_pct = max(1, eight_bits_to_percent(brightness))
 
         if (
             target_pct is not None
@@ -737,7 +729,8 @@ class MyHOMELight(MyHOMEEntity, LightEntity):
 
             # Determine Value (brightness 0-100%)
             if ATTR_BRIGHTNESS in kwargs:
-                v = eight_bits_to_percent(kwargs[ATTR_BRIGHTNESS])
+                # brightness 1..2 of 255 is "on at minimum", not value 0
+                v = max(1, eight_bits_to_percent(kwargs[ATTR_BRIGHTNESS]))
             elif ATTR_BRIGHTNESS_PCT in kwargs:
                 v = kwargs[ATTR_BRIGHTNESS_PCT]
             elif self._attr_brightness_pct is not None and self._attr_brightness_pct > 0:
@@ -831,11 +824,12 @@ class MyHOMELight(MyHOMEEntity, LightEntity):
                     self._fade_engine.start_fade(start_pct, target_pct, transition)
                     return
 
-                # native path (exact pre-existing)
+                # native path (exact pre-existing). The speed field is 0..255 and
+                # OWNd drops anything beyond it to 0 (no fade), so saturate.
                 if ATTR_TRANSITION in kwargs:
                     await self._gateway_handler.send(
                         OWNLightingCommand.set_brightness(
-                            self._full_where, target_pct, int(transition)
+                            self._full_where, target_pct, min(255, int(transition))
                         )
                     )
                 else:
@@ -865,9 +859,9 @@ class MyHOMELight(MyHOMEEntity, LightEntity):
                     self._fade_engine.start_fade(start_pct, target_pct, transition)
                     return
 
-                # native switch_on with speed
+                # native switch_on with speed (0..255; beyond that OWNd sends no speed)
                 await self._gateway_handler.send(
-                    OWNLightingCommand.switch_on(self._full_where, int(transition))
+                    OWNLightingCommand.switch_on(self._full_where, min(255, int(transition)))
                 )
                 self._apply_brightness_state(target_pct, is_on=True)
                 self.async_schedule_update_ha_state()
@@ -905,9 +899,9 @@ class MyHOMELight(MyHOMEEntity, LightEntity):
                 self._fade_engine.start_fade(start_pct, 0, transition)
                 return
 
-            # native
+            # native (speed 0..255; beyond that OWNd sends no speed)
             await self._gateway_handler.send(
-                OWNLightingCommand.switch_off(self._full_where, int(transition))
+                OWNLightingCommand.switch_off(self._full_where, min(255, int(transition)))
             )
             return
 
