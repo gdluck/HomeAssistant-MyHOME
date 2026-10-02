@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import ChainMap
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import voluptuous as vol
 from homeassistant.const import CONF_MAC
@@ -35,7 +35,7 @@ SERVICE_SWEEP_BUS = "sweep_bus"
 
 #: Fields of ``myhome.turn_on_timed`` (services.yaml); the light entity uses the
 #: brightness fields, the switch entity accepts and ignores them.
-TURN_ON_TIMED_SCHEMA: dict[vol.Marker, object] = {
+TURN_ON_TIMED_SCHEMA: dict[str | vol.Marker, Any] = {
     vol.Optional("duration"): vol.Coerce(float),
     vol.Optional("hours", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=255)),
     vol.Optional("minutes", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=59)),
