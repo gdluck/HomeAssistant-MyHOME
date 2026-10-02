@@ -154,14 +154,14 @@ def _get_cen_info_from_device(device: dr.BaseDeviceEntry) -> tuple[bool, int | N
             except ValueError:
                 pass
 
-    # Reject standard entities that are not button transmitters
-    # (e.g. lights, covers, thermostats, binary sensors with WHO in 1, 2, 4, 5, 9, 18)
+    # Reject standard entities that are not button transmitters: any device whose
+    # identifier names a WHO (lights, covers, thermostats, sensors, audio zones...).
     for identifier in device.identifiers:
         if identifier[0] != DOMAIN:
             continue
         ident = str(identifier[1])
         parts = ident.split("-")
-        if len(parts) >= 3 and parts[-2] in ("1", "2", "4", "5", "9", "18"):
+        if len(parts) >= 3 and parts[-2] not in ("15", "25", "cen", "cenplus"):
             return False, None
 
     # Gateway or unspecified MyHOME device

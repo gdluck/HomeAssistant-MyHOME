@@ -1644,3 +1644,30 @@ def test_status_request_log_filter():
 
 
 
+
+
+def test_status_request_log_filter_keeps_dimension_writes_as_errors():
+    """Only requests (*#WHO*WHERE[*DIM]##) are retries worth hiding; a failed dimension write is an error."""
+    import logging
+
+    from custom_components.myhome.gateway import _StatusRequestLogFilter
+
+    log_filter = _StatusRequestLogFilter()
+
+    def record(frame: str) -> logging.LogRecord:
+        return logging.LogRecord(
+            name="custom_components.myhome.gateway", level=logging.ERROR, pathname="gateway.py", lineno=1,
+            msg="%s Could not send message `%s`. Retrying (%d)...", args=("gw_id", frame, 1), exc_info=None,
+        )
+
+    dimension_request = record("*#4*1*14##")
+    log_filter.filter(dimension_request)
+    assert dimension_request.levelno == logging.DEBUG
+
+    brightness_write = record("*#1*12*#1*50*0##")
+    log_filter.filter(brightness_write)
+    assert brightness_write.levelno == logging.ERROR
+
+    set_point_write = record("*#4*1*#14*0210*3##")
+    log_filter.filter(set_point_write)
+    assert set_point_write.levelno == logging.ERROR

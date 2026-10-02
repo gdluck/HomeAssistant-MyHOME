@@ -242,6 +242,15 @@ class DecoderPool:
             self._saved = self._snapshot()
             await self._store.async_save(self._saved)
 
+    def detach_store(self) -> None:
+        """Stop persisting: what :meth:`async_save` wrote is what the next setup restores.
+
+        The zones leaving Home Assistant on an unload release their claims
+        (bookkeeping only, the amplifiers keep playing); written out, that
+        emptied the books the save just made.
+        """
+        self._store = None
+
     def restore(self, data: object) -> None:
         """Take over saved books, ignoring whatever no longer fits the configuration.
 

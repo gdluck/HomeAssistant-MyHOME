@@ -5126,3 +5126,34 @@ async def test_mute_volume_remembers_previous_volume(hass, player):
 
         await player.async_mute_volume(False)
         set_vol.assert_called_with(0.8)
+
+
+def test_decoder_state_changed_reverse_sync_ignores_the_decoder_where_we_put_it(hass, player, mock_gateway):
+    """A pre-gain that saturates the decoder at 1.0 must not pull the zone volume down on every state tick."""
+    player._active_decoder = "media_player.squeezelite_1"
+    player._attr_volume_level = 0.8
+    player._syncing_volume = False
+    player.async_schedule_update_ha_state = MagicMock()
+    mock_pool = MagicMock(spec=DecoderPool)
+    mock_pool.get_pre_gain.return_value = 30  # 0.8 + 0.3 -> capped at 1.0
+    _set_pool(player, mock_pool)
+
+    # Metadata tick: the decoder reports the 1.0 we set, with the same volume as before
+    old = State("media_player.squeezelite_1", MediaPlayerState.PLAYING, {"volume_level": 1.0})
+    new = State("media_player.squeezelite_1", MediaPlayerState.PLAYING, {"volume_level": 1.0, "media_position": 12})
+    event = MagicMock()
+    event.data = {"entity_id": "media_player.squeezelite_1", "new_state": new, "old_state": old}
+    player._async_decoder_state_changed(event)
+    assert player._attr_volume_level == 0.8
+
+    # The first state after our own volume_set (no old volume): still where we put it
+    event.data = {"entity_id": "media_player.squeezelite_1", "new_state": new, "old_state": None}
+    player._async_decoder_state_changed(event)
+    assert player._attr_volume_level == 0.8
+
+    # A real external change (the StreamMagic app) does sync: 0.6 - 0.3 = 0.3
+    new_ext = State("media_player.squeezelite_1", MediaPlayerState.PLAYING, {"volume_level": 0.6})
+    event.data = {"entity_id": "media_player.squeezelite_1", "new_state": new_ext, "old_state": old}
+    player._async_decoder_state_changed(event)
+    assert pytest.approx(player._attr_volume_level, 0.01) == 0.3
+

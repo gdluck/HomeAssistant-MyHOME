@@ -212,7 +212,7 @@ class EventSessionRunner:
                 self.log_id,
             )
         elif isinstance(res, dict) and not res.get("Success", True):
-            if res.get("Message") in ("password_error", "password_required", "negotiation_refused", "connection_refused"):
+            if res.get("Message") in ("password_error", "password_required", "negotiation_error", "negotiation_refused", "connection_refused"):
                 LOGGER.error(
                     "%s Event session authentication or connection refused (%s). "
                     "Terminating event listener to prevent gateway lockout.",
@@ -353,7 +353,7 @@ class CommandWorkerPool:
     def _connect_refused(self, result: Any, worker_id: int) -> bool:
         """A command-session ``connect()`` result the worker must not retry on."""
         if isinstance(result, dict) and not result.get("Success", True):
-            if result.get("Message") in ("password_error", "password_required", "negotiation_refused", "connection_refused"):
+            if result.get("Message") in ("password_error", "password_required", "negotiation_error", "negotiation_refused", "connection_refused"):
                 LOGGER.error(
                     "%s Command session authentication or connection refused (%s). "
                     "Terminating sending worker %s to prevent gateway lockout.",

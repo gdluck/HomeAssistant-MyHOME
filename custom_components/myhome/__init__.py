@@ -394,6 +394,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: MyHOMEConfigEntry) -> b
     if isinstance(runtime, MyHOMERuntimeData) and runtime.decoder_pool:
         # A reload leaves the amplifiers playing: keep the groups for the next setup.
         await runtime.decoder_pool.async_save()
+        # The zones about to be removed release their claims; that must not be saved.
+        runtime.decoder_pool.detach_store()
 
     if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         return False
