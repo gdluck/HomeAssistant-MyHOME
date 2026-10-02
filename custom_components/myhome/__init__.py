@@ -22,6 +22,7 @@ from .const import (
     DATA_OWND_VERSION,
     DOMAIN,
     INTEGRATION_VERSION,
+    ISSUE_SHARED_BUS_DETECTED,
     LOGGER,
     PLATFORMS,
     get_ownd_version,
@@ -31,6 +32,7 @@ from .decoder_pool import decoder_pool_store
 from .gateway import MyHOMEGatewayHandler, command_session_limit
 from .legacy_yaml import load_legacy_myhome_yaml
 from .migrate import migrate_entry_and_registries, prune_stale_devices
+from .repairs import async_delete_shared_bus_issue
 from .services import async_setup_services
 from .topology import async_check_primary_links
 
@@ -359,9 +361,27 @@ async def async_remove_entry(hass: HomeAssistant, entry: MyHOMEConfigEntry) -> N
     """Drop what a removed gateway leaves behind: its store, its repair issues, and
     flag the secondary/standby gateways it was the primary of (#453)."""
     await decoder_pool_store(hass, entry.entry_id).async_remove()
+    # Issues are keyed by entry id, by the gateway MAC as the entities spell it
+    # (unresponsive_zone_<mac>-4-<where>) or by the clean MAC (shared_bus_detected,
+    # gateway_failover).
+    mac = str(entry.data.get(CONF_MAC) or entry.unique_id or "")
+    clean_mac = mac.replace(":", "").lower()
     issue_registry = ir.async_get(hass)
     for domain, issue_id in list(issue_registry.issues):
-        if domain == DOMAIN and (issue_id.endswith(f"_{entry.entry_id}") or f"_{entry.entry_id}_" in issue_id):
+        if domain != DOMAIN:
+            continue
+        if not (
+            issue_id.endswith(f"_{entry.entry_id}")
+            or f"_{entry.entry_id}_" in issue_id
+            or (mac and f"_{mac}-" in issue_id)
+            or (clean_mac and (issue_id.endswith(f"_{clean_mac}") or f"_{clean_mac}_" in issue_id))
+        ):
+            continue
+        issue = issue_registry.issues.get((domain, issue_id))
+        data = getattr(issue, "data", None) or {}
+        if issue_id.startswith(ISSUE_SHARED_BUS_DETECTED) and data.get("mac_a") and data.get("mac_b"):
+            async_delete_shared_bus_issue(hass, str(data["mac_a"]), str(data["mac_b"]))  # also drops the evidence
+        else:
             ir.async_delete_issue(hass, DOMAIN, issue_id)
     async_check_primary_links(hass, removed=entry.entry_id)
 
@@ -374,6 +394,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: MyHOMEConfigEntry) -> b
     if isinstance(runtime, MyHOMERuntimeData) and runtime.decoder_pool:
         # A reload leaves the amplifiers playing: keep the groups for the next setup.
         await runtime.decoder_pool.async_save()
+        # The zones about to be removed release their claims; that must not be saved.
+        runtime.decoder_pool.detach_store()
 
     if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         return False

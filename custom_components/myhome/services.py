@@ -3,19 +3,27 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, cast
+from collections import ChainMap
+from typing import TYPE_CHECKING, Any, cast
 
+import voluptuous as vol
 from homeassistant.const import CONF_MAC
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import service as ha_service
+from homeassistant.helpers import target as target_helpers
+from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity_platform import DATA_DOMAIN_PLATFORM_ENTITIES
 
 from .const import (
     ATTR_GATEWAY,
     ATTR_MESSAGE,
     DOMAIN,
     SERVICE_STOP_COVER_CALIBRATION,
+    SERVICE_TURN_ON_TIMED,
 )
 from .data import get_runtime_data
+from .typing_compat import as_any
 
 if TYPE_CHECKING:
     from .gateway import MyHOMEGatewayHandler
@@ -25,6 +33,65 @@ _LOGGER = logging.getLogger(__name__)
 SERVICE_SYNC_TIME = "sync_time"
 SERVICE_SEND_MESSAGE = "send_message"
 SERVICE_SWEEP_BUS = "sweep_bus"
+
+#: Fields of ``myhome.turn_on_timed`` (services.yaml); the light entity uses the
+#: brightness fields, the switch entity accepts and ignores them.
+TURN_ON_TIMED_SCHEMA: dict[vol.Marker, Any] = {
+    vol.Optional("duration"): vol.Coerce(float),
+    vol.Optional("hours", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=255)),
+    vol.Optional("minutes", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=59)),
+    vol.Optional("seconds", default=0): vol.All(vol.Coerce(float), vol.Range(min=0, max=59)),
+    vol.Optional("brightness"): vol.All(vol.Coerce(int), vol.Range(min=1, max=255)),
+    vol.Optional("brightness_pct"): vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
+}
+
+
+def _platform_entities(hass: HomeAssistant, domain: str) -> dict[str, Entity]:
+    """Return the live ``<domain>.*`` entities of this integration.
+
+    The dict is the one ``EntityPlatform`` fills as it adds entities (it calls
+    ``setdefault`` on the same key), so it may be created here, before any
+    platform exists, and stays current for the life of Home Assistant.
+    """
+    maps = hass.data.setdefault(DATA_DOMAIN_PLATFORM_ENTITIES, {})
+    return maps.setdefault((domain, DOMAIN), {})
+
+
+def _register_turn_on_timed(hass: HomeAssistant) -> None:
+    """Register ``myhome.turn_on_timed`` once, for lights and switches together.
+
+    ``EntityPlatform.async_register_entity_service`` binds the handler to the
+    entities of the platform that registers a name first and silently drops the
+    second registration, so registering from each platform reached lights or
+    switches, never both (the second target was a silent no-op).
+    """
+    entities: ChainMap[str, Entity] = ChainMap(
+        _platform_entities(hass, "light"), _platform_entities(hass, "switch")
+    )
+    ha_service.async_register_entity_service(
+        hass,
+        DOMAIN,
+        SERVICE_TURN_ON_TIMED,
+        entities=entities,
+        func="async_turn_on_timed",
+        job_type=None,
+        schema=as_any(TURN_ON_TIMED_SCHEMA),
+    )
+
+
+def _cover_gateway_macs(hass: HomeAssistant, call: ServiceCall) -> set[str]:
+    """MACs of the gateways owning the covers a service call targets (entity, device, area...)."""
+    selected = target_helpers.async_extract_referenced_entity_ids(
+        hass, target_helpers.TargetSelection(call.data), True
+    )
+    covers = _platform_entities(hass, "cover")
+    macs: set[str] = set()
+    for entity_id in selected.referenced | selected.indirectly_referenced:
+        entity = covers.get(entity_id)
+        mac = getattr(getattr(entity, "_gateway_handler", None), "mac", None)
+        if mac:
+            macs.add(str(mac))
+    return macs
 
 
 def _loaded_gateways(hass: HomeAssistant) -> dict[str, MyHOMEGatewayHandler]:
@@ -201,12 +268,23 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         return
 
     async def handle_stop_cover_calibration(call: ServiceCall) -> None:
-        """Handle stopping active and queued cover calibrations."""
+        """Handle stopping active and queued cover calibrations.
+
+        With a ``gateway`` only that gateway is stopped; with cover targets only the
+        gateways those covers belong to; with neither, every gateway.
+        """
         from .cover import async_stop_cover_calibration
         gateway = call.data.get(ATTR_GATEWAY, None)
+        if gateway is None:
+            macs = _cover_gateway_macs(hass, call)
+            if macs:
+                for mac in sorted(macs):
+                    await async_stop_cover_calibration(hass, gateway_mac=mac)
+                return
         await async_stop_cover_calibration(hass, gateway_mac=gateway)
 
     hass.services.async_register(DOMAIN, SERVICE_SYNC_TIME, handle_sync_time)
     hass.services.async_register(DOMAIN, SERVICE_SEND_MESSAGE, handle_send_message)
     hass.services.async_register(DOMAIN, SERVICE_SWEEP_BUS, handle_sweep_bus)
     hass.services.async_register(DOMAIN, SERVICE_STOP_COVER_CALIBRATION, handle_stop_cover_calibration)
+    _register_turn_on_timed(hass)

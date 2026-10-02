@@ -187,7 +187,11 @@ class MyHOMEAlarmControlPanel(MyHOMEEntity, AlarmControlPanelEntity):
         )
         if message.is_alarm:
             self._attr_alarm_state = STATE_TRIGGERED
-        elif message.is_armed_away:
+        elif message.is_armed_away and message.state_code != 1:
+            # WHAT 1 ("activation") is "system operational", not armed: the F454
+            # trace (#311) sends it on every disarm (*5*2 -> *5*1 -> *5*9) and in
+            # disarmed status dumps (#466, #564); arming is *5*1 -> *5*8 (engage).
+            # OWNd <= 2.0.0b9 still counts WHAT 1 as armed_away (OWNd#66 does not).
             self._attr_alarm_state = STATE_ARMED_AWAY
         elif message.is_armed_home:
             self._attr_alarm_state = STATE_ARMED_HOME

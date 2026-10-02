@@ -7,7 +7,7 @@
         "title": "Choisisez votre serveur \"MyHome\"",
         "description": "MyHOME garde ouverte une connexion permanente pour les événements, plus une connexion par worker de commande (1 par défaut). Une passerelle n'accepte qu'un petit nombre de connexions OpenWebNet simultanées (5 sur une F455, moins sur une MH200N), partagées avec tout ce qui s'y connecte : l'application Legrand/BTicino Home+Project, d'autres instances Home Assistant, d'autres intégrations. Si les connexions sont épuisées, MyHOME ou l'autre client est refusé ou déconnecté. Fermez les clients inutiles et gardez un nombre de workers de commande faible.",
         "data": {
-          "host": "Adresse IP"
+          "serial": "Passerelle"
         }
       },
       "port": {
@@ -59,7 +59,8 @@
         "data": {
           "host": "Adresse IP",
           "port": "Port / débit en bauds",
-          "password": "Mot de passe"
+          "password": "Mot de passe",
+          "baudrate": "Débit (bauds)"
         }
       },
       "bus_topology": {
@@ -112,6 +113,7 @@
         "title": "Options MyHome",
         "description": "Parametres système avancés",
         "data": {
+          "name": "Modèle de passerelle",
           "source_1_name": "Source 1 — nom de l'appareil raccordé à l'entrée S1 de la matrice (laisser vide si rien n'est connecté)",
           "source_1_tuner": "La source 1 est un tuner (F500) : ajoute une entité radio avec stations, fréquence et RDS",
           "source_2_name": "Source 2 — nom de l'appareil raccordé à l'entrée S2 de la matrice (laisser vide si rien n'est connecté)",
@@ -251,7 +253,7 @@
     },
     "sweep_bus": {
       "name": "Balayage de l'état du bus",
-      "description": "Déclenche une interrogation en lecture seule de tous les sous-systèmes du bus (éclairage, volets, régulation thermique, horloge et diagnostic de la passerelle) pour alimenter le tampon circulaire de diagnostic.",
+      "description": "Déclenche une interrogation en lecture seule de tous les sous-systèmes du bus (volets, régulation thermique, alarme intrusion, diffusion sonore, compteurs d'énergie, horloge et diagnostic de la passerelle) pour alimenter le tampon circulaire de diagnostic.",
       "fields": {
         "gateway": {
           "name": "Passerelle",
@@ -377,6 +379,9 @@
     },
     "cover_reports_position": {
       "message": "{name} signale sa position ; la calibration du temps de course ne s'y applique pas"
+    },
+    "cover_is_scope": {
+      "message": "{name} commande plusieurs volets à la fois ; calibrez chacun d'eux individuellement"
     },
     "calibration_in_progress": {
       "message": "{name} est déjà en cours de calibration"

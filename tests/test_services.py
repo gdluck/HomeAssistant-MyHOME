@@ -226,3 +226,26 @@ async def test_stop_cover_calibration_service_forwards_gateway(hass: HomeAssista
     with patch("custom_components.myhome.cover.async_stop_cover_calibration", AsyncMock(return_value=True)) as stop:
         await hass.services.async_call(DOMAIN, "stop_cover_calibration", {ATTR_GATEWAY: "00:03:50:aa:bb:cc"}, blocking=True)
     stop.assert_awaited_once_with(hass, gateway_mac="00:03:50:aa:bb:cc")
+
+
+async def test_stop_cover_calibration_targeted_at_covers_stops_their_gateways_only(hass: HomeAssistant) -> None:
+    """The documented entity form: a cover target stops that cover's gateway, not every gateway."""
+    from unittest.mock import AsyncMock, patch
+
+    from homeassistant.helpers.entity_platform import DATA_DOMAIN_PLATFORM_ENTITIES
+
+    cover_a = MagicMock(entity_id="cover.a")
+    cover_a._gateway_handler.mac = "00:03:50:aa:bb:01"
+    cover_b = MagicMock(entity_id="cover.b")
+    cover_b._gateway_handler.mac = "00:03:50:aa:bb:02"
+    hass.data.setdefault(DATA_DOMAIN_PLATFORM_ENTITIES, {})[("cover", DOMAIN)] = {"cover.a": cover_a, "cover.b": cover_b}
+
+    await async_setup_services(hass)
+    with patch("custom_components.myhome.cover.async_stop_cover_calibration", AsyncMock(return_value=True)) as stop:
+        await hass.services.async_call(DOMAIN, "stop_cover_calibration", {"entity_id": ["cover.a"]}, blocking=True)
+    stop.assert_awaited_once_with(hass, gateway_mac="00:03:50:aa:bb:01")
+
+    # a target no loaded cover matches falls back to the documented default: every gateway
+    with patch("custom_components.myhome.cover.async_stop_cover_calibration", AsyncMock(return_value=True)) as stop:
+        await hass.services.async_call(DOMAIN, "stop_cover_calibration", {"entity_id": ["cover.unknown"]}, blocking=True)
+    stop.assert_awaited_once_with(hass, gateway_mac=None)

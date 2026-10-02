@@ -1322,7 +1322,14 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
             selected_pri = self.options.get(CONF_PRIMARY_GATEWAY)  # type: ignore[attr-defined]
             if not selected_pri and gw_options:
                 selected_pri = gw_options[0]["value"]
-            if selected_pri and (suggested_role is None or not suggested_whos):
+            # Smart defaults only make sense on a shared bus: validate_topology_input
+            # rejects a secondary role on a standalone gateway, so suggesting one
+            # there would make the form fail as submitted.
+            if (
+                selected_pri
+                and (suggested_role is None or not suggested_whos)
+                and self.options.get(CONF_BUS_TOPOLOGY) == TOPOLOGY_SHARED  # type: ignore[attr-defined]
+            ):
                 from .topology import entry_for_mac, entry_mac, infer_shared_bus_topology
 
                 pri_entry = entry_for_mac(self.hass, selected_pri)

@@ -478,12 +478,22 @@ class CalibrateAllCoversButtonEntity(ButtonEntity):
         return bool(getattr(self._gateway_handler, "available", True)) and bool(self._cover_entity_ids())
 
     def _cover_entity_ids(self) -> list[str]:
+        from .cover_scope import CoverScope
+
         registry = er.async_get(self.hass)
-        return sorted(
-            e.entity_id
-            for e in er.async_entries_for_config_entry(registry, self._config_entry.entry_id)
-            if e.domain == "cover" and not e.disabled
-        )
+        mac = self._gateway_handler.mac
+        entity_ids = []
+        for e in er.async_entries_for_config_entry(registry, self._config_entry.entry_id):
+            if e.domain != "cover" or e.disabled or not e.unique_id:
+                continue
+            # A general, area or group cover cannot be calibrated (no stop comes
+            # back for the scope WHERE); its members are in this list already.
+            _who, device_id = parse_unique_id(e.unique_id, mac)
+            address = Address.from_device_id(device_id)
+            if CoverScope.of(address.where, address.interface) is not None:
+                continue
+            entity_ids.append(e.entity_id)
+        return sorted(entity_ids)
 
     async def async_press(self) -> None:
         if not self.available:

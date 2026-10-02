@@ -30,7 +30,7 @@ The MyHOME integration communicates with SCS bus gateways over TCP/IP or RS232/U
 ## 🔌 Connection Setup via Config Flow
 
 ### Step 1: Initial Discovery
-- In many networks, MyHOME gateways announce themselves via **SSDP** or **mDNS**.
+- In many networks, MyHOME gateways announce themselves via **SSDP** (UPnP); mDNS/zeroconf is not used.
 - If discovered automatically, Home Assistant displays a notification prompting to configure the discovered gateway.
 - If configuring manually: Go to **Settings** -> **Devices & Services** -> **Add Integration** -> search **MyHOME**.
 
@@ -41,8 +41,8 @@ The MyHOME integration communicates with SCS bus gateways over TCP/IP or RS232/U
 | **Host** | `host` | String | - | IPv4 address or hostname of the OpenWebNet gateway (e.g. `192.168.1.50`). A static IP or permanent DHCP reservation is strongly advised. |
 | **Port** | `port` | Integer | `20000` | TCP port for the OpenWebNet service (standard default is `20000`). |
 | **Password** | `password` | String | None | OpenWebNet password. Can be numeric (4 or 9 digits) or alphanumeric depending on gateway model and firmware. For **MyHomeServer1**, use the installer password configured in MyHOME_Up. Leave blank if open LAN is active. |
-| **Serial Device** | `device` | String | None | Port path (e.g. `/dev/ttyUSB0` or `COM3`) when connecting via BTicino 3578 USB/Serial interface. |
-| **Gateway Model** | `model` | Select | Auto-detected | Hardware model (e.g. `MyHomeServer1`, `F454`, `MH201`, `F453AV`). Auto-detected during handshake, or selected manually. |
+| **Serial Device** | `port` | String | None | Port path (e.g. `/dev/ttyUSB0` or `COM3`) when connecting via BTicino 3578 USB/Serial interface. |
+| **Gateway Model** | `modelName` (setup) / `name` (options) | Select | Auto-detected | Hardware model (e.g. `MyHomeServer1`, `F454`, `MH201`, `F453AV`). Auto-detected during handshake, or selected manually. |
 
 ---
 
@@ -91,23 +91,30 @@ You can adjust integration runtime parameters at any time without re-adding the 
 <!-- GATEWAY_OPTIONS_START -->
 | Option | Key | Selector / Type | Default | Session / Model Limits | Description |
 | :--- | :--- | :---: | :---: | :--- | :--- |
-| **Command Worker Concurrency** | `worker_count` | Integer | `1` | Range 1–10 (capped by model: 1 for MH200/MH201, 2 for MH202, 4 for F454/MHS1) | Number of concurrent asynchronous command sessions dispatched to the gateway. |
+| **Command Worker Concurrency** | `command_worker_count` | Integer | Profile default (`2` on MyHomeServer1, `1` elsewhere) | Range 1–10 (capped by model: 1 for MH200/MH201, 2 for MH202, 4 for F454/F455/F461/MHS1) | Number of concurrent asynchronous command sessions dispatched to the gateway. |
 | **Dimmer Transition Mode** | `transition_mode` | Select | `software_stepped` | `software_stepped`, `native`, `auto` | Home Assistant software-stepped fade vs native hardware speed parameter. |
 | **Event Bus Broadcasting** | `generate_events` | Boolean | `False` | All gateways | Emits raw OpenWebNet bus frames onto the Home Assistant event bus as `myhome_message_event`. |
-| **Broadcast Re-sync** | `broadcast_resync` | Boolean | `True` | All gateways | Automatically triggers targeted entity queries when general or area broadcast commands (`WHERE = 0`) are received. |
+| **Broadcast Re-sync** | `broadcast_resync` | Boolean | `True` | All gateways | After a group, area or general lighting command, waits a 0.5 s debounce window for member echoes and then sweeps the group/area addresses for status (UI label: *Sweep group/area/general light addresses for status*). |
 | **Gateway Host Address** | `address` | IPv4 String | Current Host | Valid IPv4 | In-place update of gateway IP address without deleting the integration entry. |
-| **Gateway Password** | `own_password` | String | Current Pass | Alphanumeric / Numeric | In-place update of OpenWebNet password without deleting the integration entry. |
+| **Gateway Password** | `password` | String | Current Pass | Alphanumeric / Numeric | In-place update of OpenWebNet password without deleting the integration entry. |
 | **Gateway Hardware Model** | `name` | Select | Current Model | `SUPPORTED_GATEWAY_MODELS` | In-place correction of gateway hardware model and active profile. |
-| **Audio Source Names** | `source_name_1`..`4` | Text | `""` | 4 Matrix inputs | Custom labels for physical sound sources plugged into F441/F441M matrix inputs (S1–S4). |
-| **Audio Source Tuner Flag** | `source_tuner_1`..`4` | Boolean | `False` | 4 Matrix inputs | Declares whether an input is an SCS radio tuner (enables RDS and frequency tuning commands). |
-| **Audio Default Routing** | `source_default_<env>` | Select | `none` | Active audio environments | Per-environment default sound source assigned when turning on amplifiers. |
-| **Proxy Decoder Entity** | `decoder_entity_1`..`4` | Entity (`media_player`) | `""` | 4 Decoder slots | External software audio player entity (e.g. Music Assistant, Squeezelite) mapped to matrix inputs. |
-| **Proxy Decoder Source** | `decoder_source_1`..`4` | Select | Slot index | 1–4 | Matrix source input plugged into the external audio player's sound card / DAC. |
-| **Proxy Decoder Pre-Gain** | `decoder_pre_gain_1`..`4` | Number | `0` | -20 dB to +20 dB | Gain trim compensation to balance volume levels across streaming sources and physical tuners. |
+| **Audio Source Names** | `source_1_name`..`source_4_name` | Text | `""` | 4 Matrix inputs | Custom labels for physical sound sources plugged into F441/F441M matrix inputs (S1–S4). |
+| **Audio Source Tuner Flag** | `source_1_tuner`..`source_4_tuner` | Boolean | `False` | 4 Matrix inputs | Declares whether an input is an SCS radio tuner (enables RDS and frequency tuning commands). |
+| **Audio Default Routing** | `default_source_env_1`..`default_source_env_9` | Select | `none` | Active audio environments | Per-environment default sound source assigned when turning on amplifiers. |
+| **Proxy Decoder Entity** | `decoder_1_entity`..`decoder_4_entity` | Entity (`media_player`) | `""` | 4 Decoder slots | External software audio player entity (e.g. Music Assistant, Squeezelite) mapped to matrix inputs. |
+| **Proxy Decoder Source** | `decoder_1_source`..`decoder_4_source` | Select | Slot index | 1–4 | Matrix source input plugged into the external audio player's sound card / DAC. |
+| **Proxy Decoder Pre-Gain** | `decoder_1_pre_gain`..`decoder_4_pre_gain` | Number | `0` | 0–100 % (0 = pre-amp off, 20 ≈ squeezelite, 100 = lock the source volume) | Pre-gain offset applied to the matrix input so streaming sources match the level of physical tuners. |
+| **Proxy Decoder Streaming Companion** | `decoder_1_companion`..`decoder_4_companion` | Entity (`media_player`) | `""` (auto-detect) | 4 Decoder slots | Media player that receives the stream URLs for a decoder that cannot play them itself (e.g. the Music Assistant player in front of a Squeezelite output). |
+| **Auto-join Streaming Groups** | `auto_join_streaming` | Boolean | `True` | All gateways | Automatically join an active streaming group when a room is turned on or its volume is adjusted from a physical wall control. |
+| **Configuration File Path** | `config_file_path` | String (entry option, no UI field) | `<config>/myhome.yaml` | Any readable path | Location of the optional `myhome.yaml` file read at startup; `/config/myhome.yaml` is tried when it is not there. |
+| **Bus Topology** | `bus_topology` | Select | `standalone` | `standalone`, `shared` | Whether this gateway shares its SCS bus with other configured gateways (multi-gateway plants). |
+| **Gateway Role** | `gateway_role` | Select | `primary` | `primary`, `secondary`, `standby` | Role on a shared bus: only the primary owns discovery and the WHO subsystems it does not delegate. |
+| **Primary Gateway** | `primary_gateway` | Select (MAC) | — | Configured gateways | The primary gateway a secondary or standby gateway follows. |
+| **Delegated Subsystems** | `delegated_whos` | Multi-select | `[]` | WHO numbers | WHO subsystems a secondary gateway handles instead of the primary. |
 <!-- GATEWAY_OPTIONS_END -->
 
-### 1. Command Worker Concurrency (`worker_count`)
-- **Range**: `1` to `10` (Default: `1`).
+### 1. Command Worker Concurrency (`command_worker_count`)
+- **Range**: `1` to `10`. New entries start at the model profile's recommended count (`2` on MyHomeServer1, `1` on every other model), which leaves connections free for the Legrand/BTicino app.
 - Dynamically capped and validated against the gateway model's hardware limit:
   - **1 worker**: MH200, MH200N, MH201, F452, F453AV, AM4890 / H4890 / LN4890, Legrand 3578 Serial, Generic.
   - **2 workers**: MH202.
@@ -115,7 +122,7 @@ You can adjust integration runtime parameters at any time without re-adding the 
 - Prevents socket flooding and gateway CPU exhaustion while maximizing throughput on modern multi-session gateways.
 
 ### 2. Dimmer Transition Mode (`transition_mode`)
-- `software_stepped` *(Default & Recommended)*: Home Assistant calculates and dispatches smooth 100-step brightness interpolation. Guarantees consistent fade behavior across all BTicino dimmer generations (F418, F41835, DALI interfaces).
+- `software_stepped` *(Default & Recommended)*: Home Assistant dispatches the fade as up to 25 brightness steps about 0.3 s apart. Guarantees consistent fade behavior across all BTicino dimmer generations (F418, F41835, DALI interfaces).
 - `native`: Passes the transition duration directly to the gateway as hardware speed parameters (`WHAT = 2`–`9`). Only supported if all physical dimmers support native hardware speed parameters.
 - `auto`: Alias for `software_stepped`.
 
@@ -130,7 +137,7 @@ You can adjust integration runtime parameters at any time without re-adding the 
 ### 5. Multi-Room Audio Routing & Dynamic Proxy Decoders (`WHO = 16`)
 - **Audio Source Names & Tuner Flags (`source_name_1`..`4`, `source_tuner_1`..`4`)**: Assign friendly names for the physical inputs on the F441/F441M audio matrix (e.g. "Living Room HiFi", "FM Tuner"). Flag tuner inputs so frequency and RDS commands are enabled.
 - **Default Source per Environment (`source_default_<env>`)**: Declares which source input is selected when an amplifier in that environment is switched on.
-- **Dynamic Proxy Decoders (`decoder_entity_1`..`4`, `decoder_source_1`..`4`, `decoder_pre_gain_1`..`4`)**: Map external software streaming players (e.g., Music Assistant, Squeezelite) to physical matrix inputs, with pre-gain calibration (-20 dB to +20 dB).
+- **Dynamic Proxy Decoders (`decoder_N_entity`, `decoder_N_source`, `decoder_N_pre_gain`, N = 1..4)**: Map external software streaming players (e.g., Music Assistant, Squeezelite) to physical matrix inputs, with a pre-gain offset of 0–100 % (0 = pre-amp off, 20 ≈ squeezelite, 100 = lock the source volume).
 
 ### 6. In-Place Gateway Reconfiguration
 - You can update the gateway IP address (`address`), password (`own_password`), or hardware model (`name`) directly within the Options Flow without removing and re-adding devices or breaking entity IDs.
@@ -263,18 +270,18 @@ Without proper coordination on a shared bus:
 
 #### Shared Bus Configuration:
 - **Primary Gateway** (configure it first):
-  - Set us_topology: shared and gateway_role: primary.
+  - Set `bus_topology: shared` and gateway_role: primary.
   - Performs active startup sweeps and entity discovery for every subsystem not delegated to a secondary.
   - Cannot leave the primary role while a secondary or standby still points at it.
 - **Secondary Gateway (Subsystem Offloading)**:
-  - Set us_topology: shared and gateway_role: secondary.
+  - Set `bus_topology: shared` and gateway_role: secondary.
   - Select the **Primary Gateway** in the dropdown.
   - Active startup sweeps for non-delegated subsystems are automatically suppressed.
   - Automatic entity discovery on bus events is suppressed for non-delegated WHOs.
   - Any pre-existing duplicate secondary entities matching the primary gateway are pruned on startup.
   - Changing the role reloads the gateway once the options are saved.
 - **Warm Standby Gateway (High Availability Failover)**:
-  - Set us_topology: shared and gateway_role: standby.
+  - Set `bus_topology: shared` and gateway_role: standby.
   - Select the **Primary Gateway** in the dropdown.
   - Functions as a warm backup (e.g. an MH202 or secondary F454 standing by behind a main F454).
   - While the primary gateway is healthy, duplicate entity discovery and startup sweeps are suppressed.

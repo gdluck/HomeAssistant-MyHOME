@@ -1217,3 +1217,20 @@ async def test_get_decoder_owner(hass):
 
     await pool.release("media_player.zone_22")
     assert pool.get_decoder_owner("media_player.dec") is None
+
+
+@pytest.mark.asyncio
+async def test_detaching_the_store_keeps_the_saved_books(hass):
+    """After the unload's save, the zones' releases must not be written over it."""
+    store = _fake_store()
+    pool = DecoderPool(hass, {"media_player.dec": 1}, store=store)
+    hass.states.async_set("media_player.dec", "idle")
+    await pool.claim("media_player.zone_22", environment="2")
+    await pool.async_save()
+    assert store.async_save.await_args.args[0]["assignments"] == {"media_player.dec": "media_player.zone_22"}
+    store.async_delay_save.reset_mock()
+
+    pool.detach_store()
+    await pool.release("media_player.zone_22")  # what async_will_remove_from_hass does
+    store.async_delay_save.assert_not_called()
+    assert pool.get_assignment("media_player.zone_22") is None

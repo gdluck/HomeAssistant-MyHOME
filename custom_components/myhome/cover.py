@@ -55,7 +55,6 @@ from .const import (
     SERVICE_CALIBRATE_COVER,
     SERVICE_RESET_COVER_TRAVEL_TIME,
     SERVICE_SET_COVER_TRAVEL_TIME,
-    SERVICE_STOP_COVER_CALIBRATION,
 )
 from .cover_calibration import (
     CalibrationInterrupted,
@@ -99,11 +98,14 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
 
     def build(ctx: DeviceContext) -> MyHOMECover:
         cfg = ctx.cfg
-        kwargs: dict[str, Any] = {}
+        kwargs: dict[str, Any] = {
+            # Where the travel time comes from until a calibration replaces it, on
+            # the first add (yaml) as on every later restart (registry).
+            "travel_time_source": "yaml" if CONF_TRAVEL_TIME in cfg else "default",
+        }
         if ctx.source != "yaml":
             # Registry / discovered covers carry their measured calibration; yaml covers
             # start from the configured travel time.
-            kwargs["travel_time_source"] = "yaml" if CONF_TRAVEL_TIME in cfg else "default"
             kwargs["calibration"] = _stored_calibration(config_entry, ctx.key)
         cls: type[MyHOMECover] = MyHOMECover
         if (scope := CoverScope.of(ctx.address.where, ctx.address.interface, cfg.get(CONF_MEMBERS) or ())) is not None:
@@ -154,7 +156,6 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
     platform = entity_platform.current_platform.get()
     if platform is not None:
         platform.async_register_entity_service(SERVICE_CALIBRATE_COVER, {}, "async_calibrate")
-        platform.async_register_entity_service(SERVICE_STOP_COVER_CALIBRATION, {}, "async_stop_calibration")
         platform.async_register_entity_service(
             SERVICE_SET_COVER_TRAVEL_TIME,
             SCHEMA_SET_COVER_TRAVEL_TIME,  # type: ignore
@@ -588,6 +589,9 @@ class MyHOMECover(MyHOMEEntity, CoverEntity):
 
     async def _calibration_run(self, direction: str) -> float:
         """Drive one full run and return its measured duration (motor start -> actuator stop)."""
+        if self._calibration_interrupted:
+            # A stop that landed in the settle pause between two runs.
+            raise CalibrationInterrupted(self._display_name, self._calibration_interrupted)
         self._stopped_event = asyncio.Event()
         self._calibration_interrupted = None
         self._fire_calibration_event("run", direction=direction)
@@ -647,7 +651,18 @@ class MyHOMECover(MyHOMEEntity, CoverEntity):
                 translation_key="cover_reports_position",
                 translation_placeholders={"name": self._display_name},
             )
-        if self._calibrating:
+        if self.scope is not None:
+            # A general, area or group WHERE moves every cover in it and no stop
+            # ever comes back for the scope itself (WHO_2.pdf §3.0.1, #433): the
+            # run would move the whole house and time out. Calibrate the members.
+            raise HomeAssistantError(
+                f"{self._display_name} moves several covers at once; calibrate each of them instead",
+                translation_domain=DOMAIN,
+                translation_key="cover_is_scope",
+                translation_placeholders={"name": self._display_name},
+            )
+        hub = self.calibration_hub
+        if self._calibrating or self in hub.queued_covers:
             raise HomeAssistantError(
                 f"{self._display_name} is already being calibrated",
                 translation_domain=DOMAIN,
@@ -655,7 +670,6 @@ class MyHOMECover(MyHOMEEntity, CoverEntity):
                 translation_placeholders={"name": self._display_name},
             )
 
-        hub = self.calibration_hub
         lock = hub.lock
         self._calibration_interrupted = None
 
@@ -668,7 +682,7 @@ class MyHOMECover(MyHOMEEntity, CoverEntity):
             async with lock:
                 hub.queued_covers.discard(self)
                 if self._calibration_interrupted:
-                    self._fire_calibration_event("failed", error=self._calibration_interrupted)  # type: ignore
+                    # Stopped while queued: the hub already fired "failed" for us.
                     raise CalibrationInterrupted(self._display_name, self._calibration_interrupted)
                 hub.active_cover = self
                 self._calibrating = True
@@ -725,11 +739,6 @@ class MyHOMECover(MyHOMEEntity, CoverEntity):
             self._gateway_handler.log_id, self._full_where, down, up,
         )
         return result
-
-    async def async_stop_calibration(self) -> None:
-        """Stop calibration on this cover's gateway."""
-        gw_mac = getattr(self._gateway_handler, "mac", None)
-        await async_stop_cover_calibration(self.hass or self._hass, gateway_mac=gw_mac)
 
     async def async_set_travel_time(
         self,
@@ -899,6 +908,9 @@ class MyHOMECover(MyHOMEEntity, CoverEntity):
             command = OWNAutomationCommand.lower_shutter(self._full_where)
         if not self._advanced:
             self._start_position = self.current_cover_position if self.current_cover_position is not None else (0 if direction == "open" else 100)
+            # A reversal mid-run starts from where the cover is now, not from
+            # where the previous run started (its frozen value is stale).
+            self._attr_current_cover_position = self._start_position
             # The clock starts when the frame is written (see _track_write),
             # not now: with a busy queue the motor is still idle for a while.
             self._move_start_time = None
@@ -967,6 +979,9 @@ class MyHOMECover(MyHOMEEntity, CoverEntity):
         curr_pos = self.current_cover_position if self.current_cover_position is not None else 50
         diff = target_position - curr_pos
         if diff == 0:
+            if self._attr_is_opening or self._attr_is_closing:
+                # Passing the target right now: stop here rather than run on to the end.
+                await self.async_stop_cover()
             return
 
         travel_fraction = abs(diff) / 100.0

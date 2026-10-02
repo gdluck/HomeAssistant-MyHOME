@@ -171,7 +171,7 @@ Colour modes are promoted from bus frames, and never removed:
 
 A DALI DT8 driver behind an F461 reports both `12` and `14`; the entity ends up with `supported_color_modes: [hs, color_temp]` and its active `color_mode` follows the last frame. Previously each frame *replaced* the set, flipping the entity between colour-picker-only and tunable-white-only. State restoration keeps the full set and the last active mode. *(#307 part 1)*
 
-> Explicit `myhome.yaml` capability locks (`rgb:` / `color_temp:` as authoritative) and ignoring the gateway's default `*12*511*127*255` / `*14*1` values are planned follow-ups.
+> Explicit `myhome.yaml` capability locks (`lock_features`, `rgb:` / `color_temp:` / `hs:` as authoritative) and the filtering of the gateway's default `*12*511*127*255` / `*14*1` values are implemented; see [lights](lights.md).
 
 ---
 

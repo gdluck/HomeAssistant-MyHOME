@@ -268,6 +268,12 @@ async def test_async_get_triggers_ignores_standard_entities(hass: HomeAssistant)
         mock_registry.async_get.return_value = climate_dev
         assert await async_get_triggers(hass, "climate_id") == []
 
+        # An audio zone (WHO=16) is no button transmitter either
+        zone_dev = MagicMock()
+        zone_dev.identifiers = {(DOMAIN, "00:03:50:aa:bb:cc-16-11#16")}
+        mock_registry.async_get.return_value = zone_dev
+        assert await async_get_triggers(hass, "zone_id") == []
+
 
 @pytest.mark.asyncio
 async def test_async_attach_trigger_with_address_isolation(hass: HomeAssistant):

@@ -210,6 +210,7 @@ def test_command_worker_pool_connect_refused(mock_handler: MagicMock) -> None:
     pool = CommandWorkerPool(mock_handler)
     assert pool._connect_refused({"Success": False, "Message": "connection_refused"}, 1)
     assert pool._connect_refused({"Success": False, "Message": "password_error"}, 1)
+    assert pool._connect_refused({"Success": False, "Message": "negotiation_error"}, 1)  # OWNd's fatal set
     assert not pool._connect_refused({"Success": True}, 1)
     assert not pool._connect_refused(None, 1)
 

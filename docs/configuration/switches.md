@@ -41,7 +41,7 @@ action: myhome.turn_on_timed
 target:
   entity_id: switch.bed_heating_pad
 data:
-  time: 1800   # Turn on and automatically turn off after 30 minutes (1800s)
+  duration: 1800   # seconds; turn on and automatically turn off after 30 minutes
 ```
 
 ---

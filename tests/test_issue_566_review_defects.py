@@ -220,10 +220,30 @@ async def test_removing_an_entry_removes_its_repair_issues(hass: HomeAssistant) 
         translation_placeholders={"decoder": "x", "platform": "y"},
     )
 
+    # Issues keyed by the gateway MAC rather than the entry id (#566 follow-up)
+    from custom_components.myhome.repairs import (
+        async_create_shared_bus_issue,
+        async_create_unresponsive_zone_issue,
+    )
+
+    async_create_unresponsive_zone_issue(hass, "00:03:50:00:12:34-4-1", "Zone 1", "Gateway")
+    async_create_unresponsive_zone_issue(hass, "00:03:50:00:12:35-4-1", "Zone 1", "Other")
+    async_create_shared_bus_issue(hass, "00:03:50:00:12:34", "00:03:50:00:12:35")
+    hass.data.setdefault(DOMAIN, {})["_shared_bus_evidence"] = {("000350001234", "000350001235"): object()}
+    # Another integration's issue that happens to mention our entry id is not ours to delete
+    ir.async_create_issue(
+        hass, "other_integration", "something_gone", is_fixable=False,
+        severity=ir.IssueSeverity.WARNING, translation_key="something",
+    )
+
     await async_remove_entry(hass, entry)
 
     remaining = {issue_id for domain, issue_id in ir.async_get(hass).issues if domain == DOMAIN}
     assert not [issue_id for issue_id in remaining if "gone" in issue_id]
+    assert not [issue_id for issue_id in remaining if "00:03:50:00:12:34" in issue_id or "000350001234" in issue_id]
+    assert "unresponsive_zone_00:03:50:00:12:35-4-1" in remaining
+    assert hass.data[DOMAIN]["_shared_bus_evidence"] == {}
+    assert ("other_integration", "something_gone") in ir.async_get(hass).issues
 
 
 # --- resync echo -----------------------------------------------------------

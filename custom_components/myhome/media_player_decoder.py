@@ -275,15 +275,27 @@ class ZoneDecoderLayer(ZoneSourceLayer):
 
         if self._active_decoder and not self._syncing_volume:
             new_state = event.data.get("new_state")
+            old_state = event.data.get("old_state")
             if new_state:
                 ext_vol = new_state.attributes.get("volume_level")
-                if ext_vol is not None and self._attr_volume_level != ext_vol:
+                old_vol = old_state.attributes.get("volume_level") if old_state is not None else None
+                if ext_vol is not None and ext_vol != old_vol:
                     pool = self._get_pool()
                     if pool and event_entity == eff_dec:
                         pre_gain_pct = pool.get_pre_gain(eff_dec)
-                        # Reverse the pre_gain offset to get approximate zone volume
-                        zone_vol = max(0.0, float(ext_vol) - pre_gain_pct / 100.0)
-                        self._attr_volume_level = zone_vol
+                        # Only an external change counts: the decoder sitting where
+                        # async_set_volume_level put it (zone + pre-gain, capped at
+                        # 1.0) is not one, or every state tick would pull a zone
+                        # whose pre-gain saturates the decoder down by the overshoot.
+                        expected = (
+                            None
+                            if self._attr_volume_level is None
+                            else min(1.0, float(self._attr_volume_level) + pre_gain_pct / 100.0)
+                        )
+                        if expected is None or abs(float(ext_vol) - expected) > 0.005:
+                            # Reverse the pre_gain offset to get approximate zone volume
+                            zone_vol = max(0.0, float(ext_vol) - pre_gain_pct / 100.0)
+                            self._attr_volume_level = zone_vol
 
         # Auto power-off when decoder stops playing (anti-hiss). Applies to the
         # zone that owns the decoder and to any other room that is on and

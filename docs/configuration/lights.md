@@ -51,7 +51,7 @@ action: myhome.turn_on_timed
 target:
   entity_id: light.hallway_light
 data:
-  time: 120   # Turn on and automatically turn off after 2 minutes
+  duration: 120   # seconds; turn on and automatically turn off after 2 minutes
 ```
 
 ---
@@ -79,7 +79,7 @@ If your actuators are physically configured into an SCS group (e.g. `WHERE = #1`
 
 ```yaml
 # /config/myhome.yaml
-groups:
+light:
   living_room_group:
     where: '#1'
     name: Living Room Group

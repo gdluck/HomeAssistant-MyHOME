@@ -183,6 +183,10 @@ class ZoneGroupLayer(ZoneDecoderLayer):
         route = self._routing_configured()
         for member_id in change.joined:
             member_ent = runtime.media_players[member_id]
+            # A member dropped from its old group moments ago still has that
+            # group's grace OFF pending; joining here must cancel it even when
+            # the leader's source is not known yet (nothing to route or wake).
+            member_ent._cancel_pending_off()
             if source_num is not None:
                 if route:
                     await member_ent._route_to(source_num, coalesce=True)

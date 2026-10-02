@@ -148,6 +148,20 @@ class TestSensorsCoverage:
         sensor.handle_event(power_msg)
 
     @pytest.mark.asyncio
+    async def test_instant_power_without_a_duration_uses_the_ownd_default(self, mock_hass, mock_gateway):
+        """The entity service marks ``duration`` optional, so the method must have a default."""
+        mock_gateway.send = AsyncMock()
+        sensor = MyHOMEPowerSensor(
+            hass=mock_hass, name="Test Pwr", device_id="sensor_pwr", who="18", where="51",
+            device_class="power", manufacturer="Bticino", model="Meter", gateway=mock_gateway,
+        )
+
+        await sensor.start_sending_instant_power()
+
+        assert str(mock_gateway.send.call_args[0][0]) == "*#18*51*#1200#1*65##"
+        assert sensor._is_streaming_active() is True
+
+    @pytest.mark.asyncio
     async def test_energy_sensor(self, mock_hass, mock_gateway):
         mock_gateway.send_status_request = AsyncMock()
 

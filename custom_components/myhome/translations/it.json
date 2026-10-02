@@ -7,7 +7,7 @@
         "title": "Scegli il tuo gateway \"MyHome\"",
         "description": "MyHOME mantiene aperta una connessione permanente per gli eventi, più una connessione per ogni worker di comando (1 di default). Un gateway accetta solo poche connessioni OpenWebNet contemporanee (5 su un F455, meno su un MH200N), condivise con tutto ciò che vi si collega: l'app Legrand/BTicino Home+Project, altre istanze di Home Assistant, altre integrazioni. Se le connessioni si esauriscono, MyHOME o l'altro client viene rifiutato o disconnesso. Chiudi i client non necessari e mantieni basso il numero di worker di comando.",
         "data": {
-          "host": "Indirizzo Ip"
+          "serial": "Gateway"
         }
       },
       "port": {
@@ -59,7 +59,8 @@
         "data": {
           "host": "Indirizzo IP",
           "port": "Porta / baudrate",
-          "password": "Password"
+          "password": "Password",
+          "baudrate": "Baud rate"
         }
       },
       "bus_topology": {
@@ -112,6 +113,7 @@
         "title": "Opzioni MyHome",
         "description": "Impostazioni di sistema avanzate",
         "data": {
+          "name": "Modello di gateway",
           "source_1_name": "Sorgente 1 — nome di ciò che è collegato all'ingresso S1 della matrice (lasciare vuoto se non è collegato nulla)",
           "source_1_tuner": "La sorgente 1 è un sintonizzatore (F500): aggiunge un'entità radio con stazioni, frequenza e RDS",
           "source_2_name": "Sorgente 2 — nome di ciò che è collegato all'ingresso S2 della matrice (lasciare vuoto se non è collegato nulla)",
@@ -251,7 +253,7 @@
     },
     "sweep_bus": {
       "name": "Scansione stato bus",
-      "description": "Esegue una richiesta di stato in sola lettura su tutti i sottosistemi del bus (luci, tapparelle, termoregolazione, orologio e diagnostica del gateway) per popolare il buffer circolare di diagnostica.",
+      "description": "Esegue una richiesta di stato in sola lettura su tutti i sottosistemi del bus (tapparelle, termoregolazione, antifurto, diffusione sonora, contatori di energia, orologio e diagnostica del gateway) per popolare il buffer circolare di diagnostica.",
       "fields": {
         "gateway": {
           "name": "Gateway",
@@ -377,6 +379,9 @@
     },
     "cover_reports_position": {
       "message": "{name} segnala la propria posizione; la calibrazione del tempo di corsa non si applica"
+    },
+    "cover_is_scope": {
+      "message": "{name} comanda più tapparelle insieme; calibra ciascuna di esse singolarmente"
     },
     "calibration_in_progress": {
       "message": "{name} è già in fase di calibrazione"

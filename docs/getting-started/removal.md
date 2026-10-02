@@ -27,7 +27,7 @@ The MyHOME integration stores non-volatile calibration data (such as measured co
    ```bash
    rm -f myhome.*
    ```
-   *(This removes stored cover travel time calibrations and cached hardware profiles).*
+   *(This removes the stored decoder-pool grouping state. Cover travel times live in the config entry options and are removed with the entry.)*
 
 ---
 
@@ -38,13 +38,10 @@ If you installed the custom Lovelace Bus Monitor card (`myhome-bus-card`):
 1. Navigate to **Settings → Dashboards → Three dots (⋮) in top right → Resources**.
 2. Locate the resource referencing:
    ```text
-   /local/myhome-bus-card.js
+   /myhome_static/myhome-bus-card.js
    ```
 3. Click on the resource and select **Delete**.
-4. In your Home Assistant `/config/www/` folder, remove the card JavaScript file if present:
-   ```bash
-   rm -f /config/www/myhome-bus-card.js
-   ```
+4. The card is served by the integration itself from `/myhome_static/`; nothing is written to `/config/www/`, so there is no file to delete.
 
 ---
 

@@ -53,10 +53,10 @@ The following table summarizes the completed architectural features and protocol
 |---|---|---|---|
 | **Standalone Protocol Engine (P1)** | Core | ✅ **Shipped** (`OWNd 2.0.0b8`) | Fully decoupled, strongly typed async engine on PyPI; supports legacy clear-text, numeric, and modern HMAC-SHA1 / HMAC-SHA256 session handshakes. |
 | **Multi-Gateway Isolation Architecture** | Core / Routing | ✅ **Shipped** (#453) | Namespaced dispatchers, independent session queues, and cross-gateway bus protection eliminating cross-talk in multi-gateway installations. |
-| **CEN / CEN+ UI Device Triggers (P2)** | WHO=15 / 25 | ✅ **Shipped** | Native Home Assistant UI device triggers with preserved 4-digit addressing (`"0001"`), parent gateway isolation, and all 8 press/held/release actions with repeat debouncing. |
+| **CEN / CEN+ UI Device Triggers (P2)** | WHO=15 / 25 | ✅ **Shipped** | Native Home Assistant UI device triggers with preserved 4-digit addressing (`"0001"`), parent gateway isolation, and all 9 press, release and rotary actions with repeat debouncing. |
 | **In-Place Gateway Reconfiguration** | Config / Options | ✅ **Shipped** | Update IP address, password, or hardware model directly through Options Flow without deleting devices or breaking entity IDs. |
 | **Dynamic Command Worker Concurrency** | Transports | ✅ **Shipped** | User-configurable (1–4 workers) command concurrency automatically capped to hardware-safe limits per gateway model (e.g. 1 for MH200/MH201, 4 for F454/MHS1). |
-| **Native Hardware Bus Timers** | WHO=1 | ✅ **Shipped** | Offloaded countdown timers on Legrand DIN actuators (F411) via `myhome.turn_on_timed` or `duration` parameters in `light.turn_on` / `switch.turn_on`. |
+| **Native Hardware Bus Timers** | WHO=1 | ✅ **Shipped** | Offloaded countdown timers on Legrand DIN actuators (F411) via `myhome.turn_on_timed`. |
 | **Central Unit Coordination (P4)** | WHO=4 | ✅ **Shipped** | Dedicated master coordination for 99-zone Central Unit (`#0`, model 3550) and 4-zone Central Unit (`#0#1`, model 4695). Master Seasonal switches propagate to subordinate zones. |
 | **Climate Zone State Diagnostics** | WHO=4 | ✅ **Shipped** (#404, #457) | Dynamic HVAC action deduction (`heating`, `cooling`, `idle`), fan mode persistence across restarts, and startup diagnostic sweeps. |
 | **Real-World CI Trace Replay Engine (P5)** | Testing / CI | ✅ **Shipped** | Automated pytest fixture engine (`tests/test_trace_replay.py`) replaying authentic on-wire captures across multiple plants (Nicola Cavallo #247, MH200 physical plant, F454/MH202 captures, F418U2 dimmers). |
@@ -223,7 +223,7 @@ graph TD
 
 | Gateway Model | Status | Current Evidence / Fixture | Community Trace Needed / Target Scenario |
 |---|---|---|---|
-| **MyHomeServer1 (MHS1)** | 🟢 **Covered** | `tests/fixtures/plants/issue_247_nicolacavallo84/` (100 on-wire frames from @nicolacavallo84) | *None needed — full production plant active in CI.* |
+| **MyHomeServer1 (MHS1)** | 🟢 **Covered** | `tests/fixtures/plants/issue_247_myhomeserver1/` (100 on-wire frames from @nicolacavallo84) | *None needed — full production plant active in CI.* |
 | **F454** | 🟢 **Covered** | Nicola Cavallo capture #247 + F454 traces in #466 & #501 | *None needed — high-speed multi-session plant active in CI.* |
 | **MH200 / MH200N** | 🟢 **Covered** | `tests/fixtures/plants/mh200_physical_plant/` (107 frames) + issue #466 & #501 traces | *None needed — physical plant with 62 lights, 7 switches, 11 covers active in CI.* |
 | **MH202** | 🟢 **Covered** | Real-world plant capture in #466 | *None needed — verified against physical MH202 installation.* |
@@ -260,7 +260,7 @@ We offer **two simple ways** to contribute real-world bus traces, tailored to yo
 #### 🏷️ Track A: Zero-CLI via Home Assistant UI (Fastest & Easiest)
 Ideal for standard users running Home Assistant with the MyHOME integration:
 
-1. **Sweep the Bus**: In Home Assistant, go to **Developer Tools** > **Services** and call `myhome.sweep_bus` (or trigger it from the Lovelace Bus Monitor Card). This actively queries all lighting, cover, HVAC, and gateway diagnostic states in under 3 seconds.
+1. **Sweep the Bus**: In Home Assistant, go to **Developer Tools** > **Services** and call `myhome.sweep_bus` (or trigger it from the Lovelace Bus Monitor Card). This actively queries the cover, HVAC, burglar-alarm, sound-system, energy and gateway diagnostic states in under 3 seconds.
 2. **Download Diagnostics**: Navigate to **Settings** > **Devices & Services** > **MyHOME** > click the three dots (`⋮`) > **Download diagnostics** (or click **`📋 Export Trace`** on the `<myhome-bus-card>`).
 3. **Submit**: Attach the downloaded `.json` file to [**RFC Discussion #248**](https://github.com/orgs/OpenWebNet-HA/discussions/248) or open a GitHub Issue.
 4. *Privacy Guarantee*: Home Assistant and MyHOME automatically redact all passwords, authentication tokens, and private credentials before exporting.

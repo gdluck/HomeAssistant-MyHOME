@@ -1,6 +1,5 @@
 from typing import Any
 
-import voluptuous as vol
 from homeassistant.components.switch import (  # type: ignore[attr-defined, unused-ignore]
     SwitchDeviceClass,
     SwitchEntity,
@@ -11,7 +10,6 @@ from homeassistant.const import (
     Platform,
 )
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity_registry import RegistryEntry
 from OWNd.message import (
@@ -27,14 +25,12 @@ from .const import (
     CONF_ICON_ON,
     CONF_MANUFACTURER,
     LOGGER,
-    SERVICE_TURN_ON_TIMED,
     build_timed_turn_on_command,
 )
 from .data import get_runtime_data
 from .discovery import DeviceContext, PlatformDiscovery, default_known_keys
 from .gateway import MyHOMEGatewayHandler
 from .myhome_device import MyHOMEEntity
-from .typing_compat import as_any
 
 PLATFORM = Platform.SWITCH
 PARALLEL_UPDATES = 0
@@ -100,18 +96,7 @@ async def async_setup_entry(
         yaml_device_id=lambda address: address.clean_key,
     ).start(listen=False)
 
-    platform = entity_platform.current_platform.get()
-    if platform is not None:
-        platform.async_register_entity_service(
-            SERVICE_TURN_ON_TIMED,
-            as_any({
-                vol.Optional("duration"): vol.Coerce(float),
-                vol.Optional("hours", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=255)),
-                vol.Optional("minutes", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=59)),
-                vol.Optional("seconds", default=0): vol.All(vol.Coerce(float), vol.Range(min=0, max=59)),
-            }),
-            "async_turn_on_timed",
-        )
+    # myhome.turn_on_timed is registered once for lights and switches in services.py.
     return True
 
 
@@ -194,8 +179,10 @@ class MyHOMESwitch(MyHOMEEntity, SwitchEntity):
         hours: int = 0,
         minutes: int = 0,
         seconds: float = 0,
+        brightness: int | None = None,  # pylint: disable=unused-argument
+        brightness_pct: int | None = None,  # pylint: disable=unused-argument
     ) -> None:
-        """Turn on switch with a hardware-offloaded bus timer."""
+        """Turn on switch with a hardware-offloaded bus timer (a relay has no level)."""
         cmd = build_timed_turn_on_command(
             self._full_where,
             duration=duration,

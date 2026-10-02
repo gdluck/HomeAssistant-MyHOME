@@ -197,7 +197,7 @@ class MyHOMELightGroup(MyHOMEEntity, LightEntity):
 
         if self._on_icon and self._off_icon:
             self._attr_icon = self._on_icon if self._attr_is_on else self._off_icon
-        self.async_write_ha_state()
+        self._publish_state()
 
     @callback
     def _async_member_changed(self, event: Event[Any]) -> None:
@@ -281,7 +281,8 @@ class MyHOMELightGroup(MyHOMEEntity, LightEntity):
         elif ATTR_HS_COLOR in kwargs:
             h, s = kwargs[ATTR_HS_COLOR]
             if ATTR_BRIGHTNESS in kwargs:
-                v_level = eight_bits_to_percent(kwargs[ATTR_BRIGHTNESS])
+                # brightness 1..2 of 255 is "on at minimum", not value 0
+                v_level = max(1, eight_bits_to_percent(kwargs[ATTR_BRIGHTNESS]))
             else:
                 v_level = self._last_brightness_pct
             await self._gateway_handler.send(
@@ -299,7 +300,9 @@ class MyHOMELightGroup(MyHOMEEntity, LightEntity):
 
         # Dispatch brightness if specified (and not already included in HSV frame)
         if ATTR_BRIGHTNESS in kwargs and ATTR_HS_COLOR not in kwargs:
-            level = eight_bits_to_percent(kwargs[ATTR_BRIGHTNESS])
+            # brightness 1..2 of 255 is "on at minimum"; level 0 (*#1*#G*#1*100*0##)
+            # is what OWNd itself decodes as "switched off".
+            level = max(1, eight_bits_to_percent(kwargs[ATTR_BRIGHTNESS]))
             await self._gateway_handler.send(
                 OWNLightingCommand.set_brightness(self._full_where, level)
             )

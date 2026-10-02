@@ -198,7 +198,7 @@ Reading it:
 - `who1013_code` / `who1013_model` — the `WHO=1013` OBJECT_MODEL reply and what the catalogue says it means; both `null` unless `who13_code` was a shared code (the question is not asked otherwise) and the gateway answered. On an MH200 they are always `null`.
 - `who1013_other_names` — the same product's other brand name(s), e.g. `["003598"]` for an F454.
 - `who1013_n_conf`, `who1013_brand`, `who1013_line` — the rest of the reply, rendered as `value (meaning)` when the value has been seen before and as the bare value when it has not, so a new one reaches the trace instead of being dropped. A traced gateway shows `"5 (Legrand BTicino)"` and `"0 (Undefined)"`.
-- `profile` — the OWNd profile actually in use (MH200 and MH200N share `MH200NProfile`; that is expected).
+- `profile` — the OWNd profile actually in use (`MH200Profile` for an MH200, `MH200NProfile` for an MH200N).
 - `conflict` — non-null exactly when a *Gateway model mismatch* repair issue is open, with the reason.
 
 If `source` is `manual` and `who13_code` is not in either table, you are the first to see that code: please open an issue with the export attached.

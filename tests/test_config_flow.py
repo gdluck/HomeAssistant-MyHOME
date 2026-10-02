@@ -2408,3 +2408,16 @@ def test_all_config_flow_literal_abort_reasons_in_catalogs(catalog_file: str) ->
     assert not missing, f"Missing literal abort reasons in {catalog_file}: {missing}"
 
 
+
+
+def test_every_form_field_has_a_label_in_every_language() -> None:
+    """The user step's dropdown is 'serial', the serial reconfigure form has 'baudrate', options has the model."""
+    import json
+    from pathlib import Path
+
+    root = Path("custom_components/myhome")
+    for name in ("strings.json", "translations/en.json", "translations/fr.json", "translations/it.json", "translations/nl.json"):
+        data = json.loads((root / name).read_text(encoding="utf-8"))
+        assert "serial" in data["config"]["step"]["user"]["data"], name
+        assert "baudrate" in data["config"]["step"]["reconfigure"]["data"], name
+        assert "name" in data["options"]["step"]["user"]["data"], name

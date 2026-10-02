@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import collections
 import logging
+import re
 import time
 from typing import Any
 
@@ -129,13 +130,16 @@ class _StatusRequestLogFilter(logging.Filter):
     (issue #406, OpenWebNet-HA/OWNd#43).
     """
 
+    _FRAME = re.compile(r"Could not send message `(\*#[^`]*)`")
+
     def filter(self, record: logging.LogRecord) -> bool:
-        if (
-            record.levelno == logging.ERROR
-            and "Could not send message `*#" in record.getMessage()
-        ):
-            record.levelno = logging.DEBUG
-            record.levelname = "DEBUG"
+        if record.levelno == logging.ERROR and (match := self._FRAME.search(record.getMessage())):
+            # A status or dimension request is ``*#WHO*WHERE##`` / ``*#WHO*WHERE*DIM##``;
+            # a dimension write (``*#WHO*WHERE*#DIM*VAL...##``, e.g. a brightness with
+            # a speed) carries a second ``*#`` and is a command whose failure matters.
+            if "*#" not in match.group(1)[2:]:
+                record.levelno = logging.DEBUG
+                record.levelname = "DEBUG"
         return True
 
 

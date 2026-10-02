@@ -21,7 +21,7 @@ Modern, async-native Home Assistant integration for **BTicino / Legrand MyHOME**
 
 Maintained by the **[OpenWebNet-HA](https://github.com/OpenWebNet-HA)** community organisation.
 
-[📦 Installation](#-installation) • [🏛️ Supported Hardware](#️-supported-hardware) • [📚 Documentation](https://openwebnet-ha.github.io/MyHOME/beta/) • [💬 Discussions](https://github.com/OpenWebNet-HA/MyHOME/discussions) • [🤝 Contributing](CONTRIBUTING.md) • [🔒 Security](SECURITY.md)
+[📦 Installation](#-installation) • [🏛️ Supported Hardware](#️-supported-hardware) • [📚 Documentation](https://openwebnet-ha.github.io/MyHOME/beta/) • [💬 Discussions](https://github.com/OpenWebNet-HA/MyHOME/discussions) • [🤝 Contributing](CONTRIBUTING.md)
 
 > [!TIP]
 > **🚀 V2 Phase 2 Architecture Now Live**: Phase 2 architecture is active across **OWNd** and **MyHOME**! Featuring strongly typed CEN / CEN+ scenario command builders and device triggers (**P2**), Thermoregulation Central Unit (3550 / 4695) master mode and zone coordination (**P4**), Multi-Gateway routing and physical plant isolation (**P6**), DALI Tunable White support, and 100.0% test coverage verified against the OpenWebNet Golden Corpus.
@@ -30,8 +30,8 @@ Maintained by the **[OpenWebNet-HA](https://github.com/OpenWebNet-HA)** communit
 
 ## 🌟 Key Features & Modern V2 Architecture
 
-- **Strongly Typed CEN / CEN+ Device Triggers & Addressing (P2)**: Native Home Assistant UI device triggers for scenario buttons with string-preserved addressing (`"0001"`, `"01"`, `"15"`), enriched event payloads (`where`, `gateway_mac`, `entry_id`), and all 8 press/release/held actions without requiring external YAML blueprints.
-- **Native Hardware Bus Light & Switch Timers (`WHO=1`)**: Hardware-offloaded countdown timers executed directly on Legrand DIN actuators (F411, etc.) via `myhome.turn_on_timed` or native `timer`/`duration` parameters in `light.turn_on` and `switch.turn_on`. Supports standard Legrand preset codes (0.5s, 30s, 1m, 2m, 3m, 4m, 5m, 15m) and custom Dimension 2 (`*#1*WHERE*#2*H*M*S##`) durations that turn off automatically even if Home Assistant restarts.
+- **Strongly Typed CEN / CEN+ Device Triggers & Addressing (P2)**: Native Home Assistant UI device triggers for scenario buttons with string-preserved addressing (`"0001"`, `"01"`, `"15"`), enriched event payloads (`where`, `gateway_mac`, `entry_id`), and all 9 press/release/held/rotary actions (plus 3 centralized shutter triggers on the gateway device) without requiring external YAML blueprints.
+- **Native Hardware Bus Light & Switch Timers (`WHO=1`)**: Hardware-offloaded countdown timers executed directly on Legrand DIN actuators (F411, etc.) via `myhome.turn_on_timed`. Supports standard Legrand preset codes (0.5s, 30s, 1m, 2m, 3m, 4m, 5m, 15m) and custom Dimension 2 (`*#1*WHERE*#2*H*M*S##`) durations that turn off automatically even if Home Assistant restarts.
 - **Real-World Gateway Trace Replay Fixtures in CI (P5)**: Automated pytest fixture engine (`tests/test_trace_replay.py`) replaying frozen on-wire bus captures from production gateways directly against the integration state machine, enabling deterministic bug reproduction and permanent regression defense for community beta testers without requiring physical hardware.
 - **Thermoregulation Central Unit Coordination (P4)**: Dedicated master coordination for 99-zone Central Unit (`#0`, model `Central Unit (3550)`) and 4-zone Central Unit (`#0#1`, model `Central Unit (4695)`). Master Heating/Cooling switches (`*4*3xx*#0##`) propagate across internal dispatchers to subordinate zones (`standalone=False`), automatically synchronizing whole-home climate operations with physical central units.
 - **Multi-Gateway Routing & Plant Isolation (P6)**: Namespaced event dispatchers (`f"myhome_cen_event_{mac}"`, `f"myhome_central_mode_{mac}"`) and device trigger filtering by parent gateway MAC (`via_device`), eliminating cross-talk and phantom triggers across physical plants combining multiple gateways (e.g. F454 + MH200N / MH201).
@@ -39,7 +39,7 @@ Maintained by the **[OpenWebNet-HA](https://github.com/OpenWebNet-HA)** communit
 - **Declarative Hardware Profiles**: Auto-detects and tunes connection limits and queue pacing specifically for your gateway model (`MH200`, `MH200N`, `MH202`, `F454`, `F455`, `AM4890`, `MyHomeServer1`, and `Legrand 3578`). Eliminates hardware session exhaustion and buffer overflows.
 - **USB / Serial Gateway & OpenZigBee Support**: Native asynchronous transport for the **Legrand 3578 USB/Serial interface** via `pyserial-asyncio` with dynamic port discovery, authentication bypass, and OpenZigBee addressing (`<8-digit id>#9`).
 - **Zero-Friction Migration**: Upgrades preserve all existing custom entity IDs (`light.keuken`, `cover.living`) and friendly names. Unique IDs migrate transparently (`MAC-WHERE` → `MAC-WHO-WHERE`) with no broken dashboards or automations.
-- **Adaptive Inter-Frame Bus Pacing**: Hardened priority command queue with model-specific inter-frame delays (e.g. 150ms for legacy MH200 vs 20ms for F454) preventing command dropping during heavy automation bursts.
+- **Adaptive Inter-Frame Bus Pacing**: Hardened priority command queue with model-specific inter-frame delays (e.g. 150 ms for a legacy MH200N vs 50 ms for an F454) preventing command dropping during heavy automation bursts.
 - **Dynamic Bus Auto-Discovery**: Automatically discovers entities from physical bus events and status sweeps without requiring manual `myhome.yaml` configuration. Full support for **F422 cross-bus routing** (e.g. `18#4#02`).
 - **Sound System 2.0 & Audio Matrix (WHO=16)**: Complete multi-room audio support for F441 / F441M matrices and amplifiers, including zone power, volume normalization (0–31 scale), software mute emulation, and dynamic streaming proxy.
 - **Streaming Audio Dynamic Proxy**: Seamlessly stream from **Music Assistant**, **Spotify Connect**, or any HA media player to wired BTicino audio zones using a thread-safe `DecoderPool` with analog gain-staging.
@@ -98,7 +98,7 @@ We now maintain a comprehensive, community-curated **[GitHub Wiki](https://githu
 ### 📊 Hardware Trace Availability Matrix
 
 <!-- TRACE_MATRIX_START -->
-| Gateway Model | WHO 0<br>Scenario | WHO 1<br>Lights | WHO 2<br>Autom. | WHO 4<br>Climate | WHO 5<br>Alarm | WHO 9<br>Power | WHO 13<br>Gateway | WHO 14<br>Lock | WHO 15<br>CEN | WHO 16<br>Audio | WHO 17<br>Scenario | WHO 18<br>Energy | WHO 22<br>Audio Diff. | WHO 25<br>Diag | WHO 1001<br>Diag | WHO 1013<br>Diag | WHO 1022<br>Diag |
+| Gateway Model | WHO 0<br>Scenario | WHO 1<br>Lights | WHO 2<br>Autom. | WHO 4<br>Climate | WHO 5<br>Alarm | WHO 9<br>Aux. | WHO 13<br>Gateway | WHO 14<br>Lock | WHO 15<br>CEN | WHO 16<br>Audio | WHO 17<br>Scenario | WHO 18<br>Energy | WHO 22<br>Audio Diff. | WHO 25<br>CEN+ | WHO 1001<br>Diag | WHO 1013<br>Diag | WHO 1022<br>Diag |
 | :--- |  :---:  |  :---:  |  :---:  |  :---:  |  :---:  |  :---:  |  :---:  |  :---:  |  :---:  |  :---:  |  :---:  |  :---:  |  :---:  |  :---:  |  :---:  |  :---:  |  :---:  |
 | **F454** |  | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |  | ✅ |  | ✅ |  | ✅ |  | ✅ |  |
 | **F455** |  | ✅ | ✅ | ✅ | ✅ |  | ✅ |  |  | ✅ |  | ✅ |  |  |  | ✅ |  |
@@ -118,8 +118,8 @@ We now maintain a comprehensive, community-curated **[GitHub Wiki](https://githu
 <!-- SUPPORTED_DOMAINS_START -->
 | Domain | WHO | Capabilities |
 |---|---|---|
-| **`light`** | WHO=1 | On/Off, Dimmers with brightness control & transitions (stepped & native), DALI DT8 Tunable White (Dimension 14, 2000K–6535K), HS/RGB colour, Hardware-offloaded bus timers (`myhome.turn_on_timed` / `timer` parameter) |
-| **`switch`** | WHO=1 | Relays, auxiliary switches, socket actuators (switch/outlet device classes), Hardware-offloaded bus timers (`myhome.turn_on_timed` / `timer` parameter) |
+| **`light`** | WHO=1 | On/Off, Dimmers with brightness control & transitions (stepped & native), DALI DT8 Tunable White (Dimension 14, 2000K–6535K), HS/RGB colour, Hardware-offloaded bus timers (`myhome.turn_on_timed`) |
+| **`switch`** | WHO=1 | Relays, auxiliary switches, socket actuators (switch/outlet device classes), Hardware-offloaded bus timers (`myhome.turn_on_timed`) |
 | **`cover`** | WHO=2 | Motorized shutters, blinds, roll-ups with state tracking, position-reporting actuators & virtual travel-time positioning |
 | **`climate`** | WHO=4 | Heating, cooling, 4-pipe systems, thermostats, setpoints, fancoil 3-speed modes, offset tracking, Central Unit 3550 (`#0`) & 4695 (`#0#1`) master coordination & seasonal propagation |
 | **`alarm_control_panel`** | WHO=5 | Central units (3485/3486), partitions, arm away/home, disarm, panic trigger, zone 0 broadcast sync |
@@ -127,7 +127,7 @@ We now maintain a comprehensive, community-curated **[GitHub Wiki](https://githu
 | **`sensor`** | WHO=1 / 4 / 18 | Power meters, energy counters (total/daily/monthly), temperature probes (3475), illuminance / lux sensors |
 | **`button`** | WHO=14 / 2 | Hardware actuator lock/unlock for lights, switches & covers (WHO=14), cover travel time calibration buttons (per cover & gateway-wide, WHO=2) |
 | **`media_player`** | WHO=16 | F441/F441M audio zones, source tracking, volume normalization, software mute, streaming dynamic proxy (Music Assistant / Spotify Connect) |
-| **`device_trigger`** *(Automations)* | WHO=15 / 25 | Stateless CEN & CEN+ scenario pushbuttons with string-preserved addressing (`"0001"`), gateway MAC isolation, and 8 native UI trigger types (short press, long press start, held, release, rotary dials) |
+| **`device_trigger`** *(Automations)* | WHO=15 / 25 | Stateless CEN & CEN+ scenario pushbuttons with string-preserved addressing (`"0001"`), gateway MAC isolation, and 9 native UI trigger types (short press, long press start, held, release, rotary dials) |
 <!-- SUPPORTED_DOMAINS_END -->
 
 *This table is automatically updated from platform definitions and [`supported_functions.md`](docs/configuration/supported_functions.md).*
@@ -297,11 +297,11 @@ Go to **Settings → Devices & Services → MyHOME → Configure** to fine-tune 
 - **Gateway Address & Password**: Update the gateway IP address or OpenWebNet password without recreating the integration.
 - **Command Worker Count**: Adjust concurrent command sessions (1 to 10 workers, default 1).
 - **Generate Bus Events (`myhome_message_event`)**: Enable firing raw OpenWebNet messages directly to the Home Assistant event bus for custom monitoring and blueprint automations.
-- **Sweep group/area/general light addresses for status**: Enabled by default. After a group, area or general lighting command, the gateway is given a short (~250 ms) debounce window to echo each member's own status before the integration sweeps the group/area itself; disable this if your gateway needs a different cadence (see [Broadcast re-sync](docs/configuration/runtime_behaviour.md#-broadcast-re-sync-group--area--general)).
+- **Sweep group/area/general light addresses for status**: Enabled by default. After a group, area or general lighting command, the gateway is given a short (0.5 s) debounce window to echo each member's own status before the integration sweeps the group/area itself; disable this if your gateway needs a different cadence (see [Broadcast re-sync](docs/configuration/runtime_behaviour.md#-broadcast-re-sync-group--area--general)).
 - **Light Transition Mode**: Select how brightness transitions are handled:
   - `software_stepped` *(Default & Recommended)*: Smooth 0.3s stepped fades interpolated in software, compatible with all MyHOME dimmers.
   - `native`: Passes through the OpenWebNet hardware speed parameter directly (for supported hardware dimmers).
-- **Audio Decoders Pool**: Map network media players (Music Assistant, Spotify Connect, WiiM, Squeezelite) to physical matrix inputs 1–4 with per-source analog pre-gain offsets (0–50%).
+- **Audio Decoders Pool**: Map network media players (Music Assistant, Spotify Connect, WiiM, Squeezelite) to physical matrix inputs 1–4 with per-source pre-gain offsets (0–100 %).
 
 ---
 
@@ -310,9 +310,9 @@ Go to **Settings → Devices & Services → MyHOME → Configure** to fine-tune 
 While the integration features **Dynamic Bus Auto-Discovery** that discovers devices automatically from bus events, existing configurations from older versions are 100% supported:
 
 1. **Automatic Search Order**: The integration automatically locates your configuration file in:
-   1. `/config/myhome.yaml` *(Standard HA config directory)*
-   2. `/config/myhome/myhome.yaml`
-   3. Custom component directory fallback
+   1. The path set in the entry option `config_file_path`, when one is set
+   2. `myhome.yaml` in the Home Assistant configuration directory *(`/config/myhome.yaml` on HA OS)*
+   3. `/config/myhome.yaml` as a fallback when the configuration directory is elsewhere
 2. **Single & Multi-Gateway Syntax**:
    - Single gateway installations do not require a root MAC header; platforms are mapped automatically to your gateway.
    - Multi-gateway installations group platforms under their respective MAC addresses (`00:03:50:xx:xx:xx`).
@@ -394,13 +394,13 @@ Without `members` the entity is `assumed_state`: Home Assistant shows separate O
 
 ### ⚡ Custom Services
 
-The integration registers three specialized services under the `myhome` domain:
+The integration registers eleven services under the `myhome` domain (full reference in [services.md](docs/configuration/services.md)); the most used are:
 
 | Service | Fields | Description |
 |---|---|---|
 | **`myhome.send_message`** | `gateway` *(optional)*<br>`message` *(required)* | Send an arbitrary, validated OpenWebNet frame (e.g. `*1*0*0##`) directly to the SCS bus. Useful for scripts, custom diagnostic probes, and testing. |
 | **`myhome.sync_time`** | `gateway` *(optional)* | Synchronizes the gateway's internal real-time clock with Home Assistant's local time using standard OpenWebNet date/time frames (WHO=13). |
-| **`myhome.start_sending_instant_power`** | `entity_id` *(required)*<br>`duration` *(required)* | Requests high-frequency instant active power telemetry (W) from energy management counters (WHO=18) for `duration` seconds. |
+| **`myhome.start_sending_instant_power`** | `entity_id` *(required)*<br>`duration` *(optional)* | Requests high-frequency instant active power telemetry (W) from energy management counters (WHO=18) for `duration` minutes (1–255; 65 when omitted). |
 
 ---
 
@@ -533,7 +533,7 @@ A major CI infrastructure enhancement introduced for beta testing is the **Trace
 ```
 
 #### How it Works:
-1. **Zero Hardware Needed for Bug Triage**: Legrand and BTicino manufacture dozens of gateway models (F454, MyHomeServer1, MH200N, MH202, 3578 USB) and modular DIN actuators with subtle firmware timing variations. When a beta tester reports unexpected behavior, clicking **"📋 Copy Capture"** on the Bus Monitor card (or downloading HA Diagnostics) packages the last 100 on-wire OpenWebNet frames with precise microsecond timestamps.
+1. **Zero Hardware Needed for Bug Triage**: Legrand and BTicino manufacture dozens of gateway models (F454, MyHomeServer1, MH200N, MH202, 3578 USB) and modular DIN actuators with subtle firmware timing variations. When a beta tester reports unexpected behavior, clicking **"📋 Copy Capture"** on the Bus Monitor card (or downloading HA Diagnostics) packages the last 500 on-wire OpenWebNet frames with precise microsecond timestamps.
 2. **Automated Discovery & Plant Setup**: Pytest automatically scans `tests/fixtures/plants/*/` for any directory containing `diagnostic_summary.json` and `myhome.yaml`.
 3. **Sequential On-Wire Replay**: The harness initializes a simulated gateway session and streams the frozen frames sequentially into Home Assistant's internal event dispatcher (`f"myhome_message_{mac}"`), exercising the exact same message routing path as physical hardware.
 4. **End-to-End State Verification**: Verifies that every single frame across Lighting (`WHO=1`), Automation (`WHO=2`), Thermoregulation (`WHO=4`), Audio (`WHO=16`), Energy (`WHO=18`), Dry Contacts (`WHO=25`), and ACK/NACK control signals updates entity states accurately with zero unhandled exceptions.
@@ -601,7 +601,7 @@ This runner:
 1. Pulls the official container (`ghcr.io/home-assistant/home-assistant:<channel>`).
 2. Runs `hass --script check_config` to validate schemas and component manifests.
 3. Automatically installs all integration dependencies (`manifest.json`).
-4. Validates clean import of all 14 integration platform modules.
+4. Validates clean import of all 9 integration platform modules.
 5. Boots Home Assistant in daemon mode and verifies zero exceptions and zero asyncio loop-blocking warnings.
 
 ### ⚡ OWNd Protocol Engine Smoke Testing
@@ -625,7 +625,7 @@ python scripts/run_ownd_smoke.py --target all
 This runner executes 4 validation gates:
 1. **Metadata Lockstep**: Verifies that the exact `OWNd==` pin in `manifest.json` matches the installed package.
 2. **Golden Corpus Conformance**: Runs 191 OpenWebNet frame fixtures (`tests/test_golden_conformance.py`) verifying parser extraction and builder parity.
-3. **Platform Clean Imports**: Verifies all 14 integration platform modules import cleanly without missing symbols or deprecation errors.
+3. **Platform Clean Imports**: Verifies all 9 integration platform modules import cleanly without missing symbols or deprecation errors.
 4. **Mock Gateway TCP Loopback**: Boots a mock OpenWebNet TCP server, negotiates session handshake (`*99*0##`), dispatches commands, and verifies frame parsing end-to-end.
 
 See the [F454 regression checks](docs/f454-regression-checks.md) for the fixes,
@@ -746,7 +746,7 @@ The development of the MyHOME integration is organized into strategic release mi
   - [x] DALI Tunable White (Dimension 14, 2000K–6535K) auto-detection and color temperature control.
   - [x] Multi-authority OpenWebNet Golden Corpus cross-validation with 100.0% line coverage (1,189 unit tests).
 - [ ] **Phase 3: Native Bus Timers & Environmental Auto-Discovery (v2.2 — Q4 2026)**
-  - [ ] Native SCS light actuator temporization / staircase timers (`WHO = 1` Dimension 2 & timed WHAT codes).
+  - [x] Native SCS light actuator temporization / staircase timers (`WHO = 1` Dimension 2 & timed WHAT codes).
   - [ ] Dynamic discovery for illuminance & motion detectors (Legrand 048834).
   - [ ] Passive bus sniffing & topology auto-mapping.
 - [ ] **Phase 4: Actuator Diagnostics & Endpoint Safety Locks (v2.3 — Q4 2026)**
