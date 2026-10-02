@@ -61,11 +61,13 @@ from .const import (
     LOGGER,
     normalize_where,
     signed_who4_temperature,
+    who4_raw_to_celsius,
 )
 from .data import MyHOMEConfigEntry
 from .discovery import Address, DeviceContext, PlatformDiscovery
 from .gateway import MyHOMEGatewayHandler
 from .myhome_device import MyHOMEEntity
+from .typing_compat import as_any
 from .where_grammar import is_probe
 
 PARALLEL_UPDATES = 0
@@ -143,7 +145,7 @@ async def async_setup_entry(
         if platform is not None:
             platform.async_register_entity_service(
                 SERVICE_SEND_INSTANT_POWER,
-                {Optional(ATTR_DURATION): All(Coerce(int), Range(min=1, max=255))},
+                as_any({Optional(ATTR_DURATION): All(Coerce(int), Range(min=1, max=255))}),
                 "start_sending_instant_power",
             )
 
@@ -275,6 +277,10 @@ async def async_setup_entry(
             hass=hass, device_id=primary, who="1", where=primary, name=f"Illuminance {normalize_where(clean) or clean}",
             device_class=SensorDeviceClass.ILLUMINANCE, manufacturer="BTicino", model="Light Sensor", gateway=gateway,
         )
+        if ctx.registry_entry is not None:
+            # yaml-era ids are `{mac}-1-{where}-illuminance`; a rebuilt id would orphan
+            # the registry entry and create a duplicate.
+            sensor._attr_unique_id = ctx.registry_entry.unique_id
         sensor.entity_id = entity_id_of(ctx)  # type: ignore[assignment]
         if ctx.registry_entry is not None:
             # yaml-era ids are `{mac}-1-{where}-illuminance`; a rebuilt id would
@@ -745,11 +751,11 @@ class MyHOMETemperatureSensor(MyHOMEEntity, SensorEntity):
         val = None
         dim_raw = getattr(message, "dimension_value", None) or getattr(message, "_dimension_value", None) or []
         if message.message_type == MESSAGE_TYPE_MAIN_TEMPERATURE:
-            val = signed_who4_temperature(dim_raw[0] if dim_raw else None, message.main_temperature)
+            val = signed_who4_temperature(message, message.main_temperature)
         elif message.message_type == MESSAGE_TYPE_SECONDARY_TEMPERATURE:
             sec = getattr(message, "secondary_temperature", None)
             if isinstance(sec, (list, tuple)) and len(sec) > 1:
-                val = signed_who4_temperature(dim_raw[0] if dim_raw else None, sec[1])
+                val = signed_who4_temperature(message, sec[1])
             elif isinstance(sec, (int, float)):
                 val = sec
             elif hasattr(message, "probe_temperature") and type(message.probe_temperature).__name__ != "MagicMock":
@@ -759,10 +765,7 @@ class MyHOMETemperatureSensor(MyHOMEEntity, SensorEntity):
             if dim_val:
                 raw = dim_val[1] if len(dim_val) >= 2 else dim_val[0]
                 try:
-                    if len(raw) == 4 and raw.startswith("1"):
-                        val = -float(raw[1:]) / 10.0
-                    else:
-                        val = float(raw) / 10.0
+                    val = who4_raw_to_celsius(raw)
                 except (ValueError, TypeError):
                     pass
         elif getattr(message, "dimension", None) == 0:
@@ -770,10 +773,7 @@ class MyHOMETemperatureSensor(MyHOMEEntity, SensorEntity):
             if dim_val:
                 raw = dim_val[0]
                 try:
-                    if len(raw) == 4 and raw.startswith("1"):
-                        val = -float(raw[1:]) / 10.0
-                    else:
-                        val = float(raw) / 10.0
+                    val = who4_raw_to_celsius(raw)
                 except (ValueError, TypeError):
                     pass
         else:

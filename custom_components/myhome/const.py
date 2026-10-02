@@ -11,7 +11,7 @@ DOMAIN = "myhome"
 
 ATTR_GATEWAY = "gateway"
 ATTR_MESSAGE = "message"
-INTEGRATION_VERSION = "2.0.0b13"
+INTEGRATION_VERSION = "2.0.0b14"
 # hass.data[DOMAIN] key holding the OWNd version resolved off the event loop
 DATA_OWND_VERSION = "_ownd_version"
 
@@ -125,7 +125,10 @@ PLATFORM_ALARM = "alarm_control_panel"
 CONF_DECODER_ENTITY = "decoder_{}_entity"     # HA media_player entity_id
 CONF_DECODER_SOURCE = "decoder_{}_source"     # BTicino source number (int 1-4)
 CONF_DECODER_PRE_GAIN = "decoder_{}_pre_gain" # Volume offset % added to decoder (0-100)
+CONF_DECODER_COMPANION = "decoder_{}_companion"  # Optional media_player that receives stream URLs for this decoder
 CONF_DECODER_SLOTS = 4                        # Maximum number of decoder slots
+CONF_AUTO_JOIN_STREAMING = "auto_join_streaming"
+DEFAULT_AUTO_JOIN_STREAMING = True
 
 # ── Matrix sources (F441M inputs S1-S4) ────────────────────────────────────
 # Friendly name per physical source input. A blank name means "no source wired
@@ -194,6 +197,30 @@ SHARED_BUS_EVIDENCE_COUNT = 3
 SHARED_BUS_EVIDENCE_WINDOW_S = 600.0
 
 
+def signed_who4_temperature(message: Any, value: float | None) -> float | None:
+    """Apply the sign digit of a WHO 4 temperature frame to the value OWNd decoded.
+
+    The bus sends ``SXXX`` (``S`` = 1 for a negative reading, tenths of a degree),
+    but OWNd reads digits 1-3 only, so ``1055`` reaches us as ``+5.5``.
+    """
+    raw = getattr(message, "_dimension_value", None)
+    first = raw[0] if isinstance(raw, (list, tuple)) and raw else None
+    if value is not None and isinstance(first, str) and len(first) == 4 and first.startswith("1"):
+        return -abs(value) if value else value  # "1000" is a sign on nothing: 0.0, never -0.0
+    return value
+
+
+def who4_raw_to_celsius(raw: str) -> float:
+    """Decode a raw WHO 4 temperature (``SXXX``, tenths of a degree) that OWNd did not decode.
+
+    Raises ``ValueError`` when ``raw`` is not a number. Exactly zero is ``0.0`` whatever the sign digit.
+    """
+    if len(raw) == 4 and raw.startswith("1"):
+        magnitude = float(raw[1:]) / 10.0
+        return -magnitude if magnitude else 0.0
+    return float(raw) / 10.0
+
+
 def eight_bits_to_percent(value: int) -> int:
     """Convert an 8-bit brightness (0-255) to percentage (0-100)."""
     return int(round((value * 100) / 255, 0))
@@ -202,20 +229,6 @@ def eight_bits_to_percent(value: int) -> int:
 def percent_to_eight_bits(value: int) -> int:
     """Convert a percentage (0-100) to 8-bit brightness (0-255)."""
     return int(round((value * 255) / 100, 0))
-
-
-def signed_who4_temperature(raw: Any, fallback: Any) -> Any:
-    """Decode a WHO 4 ``c1c2c3c4`` temperature, honouring the sign digit.
-
-    ``c1`` is ``1`` for a negative value (``1035`` is -3.5 °C). OWNd 2.0.0b8 only
-    applies the sign to dimension 15, so dimension 0 readings below zero come
-    back positive; ``fallback`` is OWNd's value, used whenever ``raw`` is not a
-    four-digit field.
-    """
-    text = str(raw) if raw is not None else ""
-    if len(text) == 4 and text.isdigit() and text[0] == "1":
-        return -float(text[1:]) / 10.0
-    return fallback
 
 
 def is_apl_address(base: str) -> bool:

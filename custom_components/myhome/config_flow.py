@@ -36,13 +36,14 @@ from voluptuous import (
     In,
     Range,
     Required,
-    Schema,
 )
 
 from .const import (
     CONF_ADDRESS,
+    CONF_AUTO_JOIN_STREAMING,
     CONF_BROADCAST_RESYNC,
     CONF_BUS_TOPOLOGY,
+    CONF_DECODER_COMPANION,
     CONF_DECODER_ENTITY,
     CONF_DECODER_PRE_GAIN,
     CONF_DECODER_SLOTS,
@@ -66,6 +67,7 @@ from .const import (
     CONF_TRANSITION_MODE,
     CONF_UDN,
     CONF_WORKER_COUNT,
+    DEFAULT_AUTO_JOIN_STREAMING,
     DEFAULT_TRANSITION_MODE,
     DOMAIN,
     IDENTIFICATION_MANUAL,
@@ -86,6 +88,21 @@ from .topology import (
     recommend_follower,
     validate_shared_bus_topology,
 )
+from .typing_compat import flow_schema
+
+TEST_CONNECTION_ABORT_REASONS = frozenset(
+    {
+        "cannot_connect",
+        "connection_closed",
+        "connection_error",
+        "connection_refused",
+        "negotiation_error",
+        "negotiation_failed",
+        "negotiation_refused",
+        "negotiation_timeout",
+    }
+)
+TEST_CONNECTION_RETRY_DELAY: float = 1.5
 
 
 class MACAddress:
@@ -162,7 +179,7 @@ class MyhomeFlowHandler(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user",
-            data_schema=Schema(
+            data_schema=flow_schema(
                 {
                     Required("serial"): In(
                         {
@@ -220,7 +237,7 @@ class MyhomeFlowHandler(ConfigFlow, domain=DOMAIN):
             pass
 
         if available_ports:
-            schema = Schema(
+            schema = flow_schema(
                 {
                     Required("port"): In(available_ports),
                     Required("baudrate", default=19200): In([9600, 19200, 38400, 57600, 115200]),
@@ -228,7 +245,7 @@ class MyhomeFlowHandler(ConfigFlow, domain=DOMAIN):
                 }
             )
         else:
-            schema = Schema(
+            schema = flow_schema(
                 {
                     Required("port"): cv.string,
                     Required("baudrate", default=19200): In([9600, 19200, 38400, 57600, 115200]),
@@ -299,7 +316,7 @@ class MyhomeFlowHandler(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="custom",
-            data_schema=Schema(
+            data_schema=flow_schema(
                 {
                     Required("address", description={"suggested_value": address_suggestion}): str,
                     Required("port", description={"suggested_value": port_suggestion}): int,
@@ -355,7 +372,7 @@ class MyhomeFlowHandler(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="custom_manual",
-            data_schema=Schema(
+            data_schema=flow_schema(
                 {
                     Required(
                         "serialNumber",
@@ -407,12 +424,15 @@ class MyhomeFlowHandler(ConfigFlow, domain=DOMAIN):
 
         return await self.async_step_password(errors={CONF_OWN_PASSWORD: "password_error"})  # type: ignore
 
-    async def async_step_test_connection(self, user_input: typing.Any = None, errors: typing.Any = {}) -> typing.Any:  # pylint: disable=unused-argument,dangerous-default-value  # type: ignore
+    async def async_step_test_connection(self, user_input: typing.Any = None, errors: typing.Any = None) -> typing.Any:  # pylint: disable=unused-argument  # type: ignore
         """Testing connection to the OWN Gateway.
 
         Given a configured gateway, will attempt to connect and negociate a
         dummy event session to validate all parameters.
         """
+        if errors is None:
+            errors = {}
+
         gateway = self.gateway_handler
         assert gateway is not None
 
@@ -429,10 +449,51 @@ class MyhomeFlowHandler(ConfigFlow, domain=DOMAIN):
             }
         )
 
-        test_session = OWNSession(gateway=gateway, logger=LOGGER)
-        test_result = await test_session.test_connection()
+        async def _run_test_connection() -> dict[str, typing.Any]:
+            try:
+                session = OWNSession(gateway=gateway, logger=LOGGER)
+                res = await session.test_connection()
+                if isinstance(res, dict):
+                    return res
+                return {"Success": False, "Message": "cannot_connect"}
+            except (OSError, TimeoutError, ConnectionError) as exc:
+                LOGGER.warning(
+                    "Gateway %s (%s:%s) test connection encountered a communication error: %s",
+                    gateway.model_name,
+                    gateway.address,
+                    gateway.port,
+                    exc,
+                )
+                return {"Success": False, "Message": "connection_error"}
+            except Exception as exc:  # pylint: disable=broad-except
+                LOGGER.exception(
+                    "Gateway %s (%s:%s) test connection encountered an unexpected error: %s",
+                    gateway.model_name,
+                    gateway.address,
+                    gateway.port,
+                    exc,
+                )
+                return {"Success": False, "Message": "cannot_connect"}
 
-        if test_result["Success"]:
+        test_result = await _run_test_connection()
+
+        # Retry once after a brief pause if the connection was dropped mid-negotiation
+        # (e.g. gateway busy, out of session slots, or stale socket recycling).
+        # We only retry connection_closed because TCP already succeeded and OWNd does
+        # not retry negotiation drops internally. We do NOT retry connection_error or
+        # cannot_connect to avoid stacking delays on dead/unreachable hosts.
+        if not test_result.get("Success") and test_result.get("Message") == "connection_closed":
+            LOGGER.warning(
+                "Gateway %s (%s:%s) test connection closed by gateway; retrying once after %ss pause",
+                gateway.model_name,
+                gateway.address,
+                gateway.port,
+                TEST_CONNECTION_RETRY_DELAY,
+            )
+            await asyncio.sleep(TEST_CONNECTION_RETRY_DELAY)
+            test_result = await _run_test_connection()
+
+        if test_result.get("Success"):
             if self._existing_entry:
                 new_data = dict(self._existing_entry.data)
                 new_data[CONF_PASSWORD] = gateway.password
@@ -472,13 +533,22 @@ class MyhomeFlowHandler(ConfigFlow, domain=DOMAIN):
                 options=_new_entry_options,
             )
         else:
-            if test_result["Message"] == "password_required":
+            msg = test_result.get("Message")
+            LOGGER.warning(
+                "Gateway %s (%s:%s) test connection failed: %s",
+                gateway.model_name,
+                gateway.address,
+                gateway.port,
+                msg,
+            )
+            if msg == "password_required":
                 return await self.async_step_password()  # type: ignore
-            elif test_result["Message"] == "password_error" or test_result["Message"] == "password_retry":
-                errors["password"] = test_result["Message"]
+            elif msg in ("password_error", "password_retry"):
+                errors["password"] = msg
                 return await self.async_step_password(errors=errors)  # type: ignore
             else:
-                return self.async_abort(reason=test_result["Message"])
+                abort_reason = msg if msg in TEST_CONNECTION_ABORT_REASONS else "cannot_connect"
+                return self.async_abort(reason=abort_reason)
 
     def _bus_primaries(self) -> list[ConfigEntry]:
         """Configured gateways a new one could share an SCS bus with.
@@ -558,7 +628,7 @@ class MyhomeFlowHandler(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="bus_topology",
-            data_schema=Schema(
+            data_schema=flow_schema(
                 {
                     Required(
                         CONF_BUS_TOPOLOGY, default=(user_input or {}).get(CONF_BUS_TOPOLOGY, TOPOLOGY_STANDALONE)
@@ -619,7 +689,7 @@ class MyhomeFlowHandler(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="port",
-            data_schema=Schema(
+            data_schema=flow_schema(
                 {
                     Required(CONF_PORT, description={"suggested_value": 20000}): int,
                 }
@@ -652,7 +722,7 @@ class MyhomeFlowHandler(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="password",
-            data_schema=Schema(
+            data_schema=flow_schema(
                 {
                     Required(
                         CONF_OWN_PASSWORD,
@@ -687,11 +757,18 @@ class MyhomeFlowHandler(ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="unknown")
         await self.async_set_unique_id(dr.format_mac(gateway.unique_id))
         LOGGER.info("Found gateway: %s", gateway.address)
-        # A configured entry only learns its new address from SSDP: the port was
-        # never discovered (20000 is assumed above), and the model name may have
-        # been chosen by the user, so writing those back would undo a reconfigure
-        # or an options-flow choice on every restart.
-        self._abort_if_unique_id_configured(updates={CONF_HOST: gateway.address})
+        # What the gateway reports about itself follows a rediscovery. The port is not
+        # among it (20000 is only assumed above, never discovered) and neither is the
+        # model name (the user may have chosen it): writing those back would undo a
+        # reconfigure on every restart.
+        updatable = {
+            CONF_HOST: gateway.address,
+            CONF_FRIENDLY_NAME: gateway.friendly_name,
+            CONF_UDN: gateway.udn,
+            CONF_FIRMWARE: gateway.firmware,
+        }
+
+        self._abort_if_unique_id_configured(updates=updatable)
 
         self.gateway_handler = gateway
         self.context.update(
@@ -786,7 +863,7 @@ class MyhomeFlowHandler(ConfigFlow, domain=DOMAIN):
                     )
 
         if is_serial:
-            schema = Schema(
+            schema = flow_schema(
                 {
                     Required("port", default=entry.data.get(CONF_HOST, "")): cv.string,
                     Required("baudrate", default=entry.data.get("baudrate", 19200)): In(
@@ -795,7 +872,7 @@ class MyhomeFlowHandler(ConfigFlow, domain=DOMAIN):
                 }
             )
         else:
-            schema = Schema(
+            schema = flow_schema(
                 {
                     Required(CONF_HOST, default=entry.data.get(CONF_HOST, "")): str,
                     Required(CONF_PORT, default=entry.data.get(CONF_PORT, 20000)): All(
@@ -840,16 +917,18 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
 
     async def async_step_init(self, user_input: typing.Any = None) -> typing.Any:  # pylint: disable=unused-argument  # type: ignore
         """Manage the MyHome options."""
-        self.options = dict(self.config_entry.options)
-        self.data = dict(self.config_entry.data)
-        if CONF_WORKER_COUNT not in self.options:
-            self.options[CONF_WORKER_COUNT] = 1
-        if CONF_GENERATE_EVENTS not in self.options:
-            self.options[CONF_GENERATE_EVENTS] = False
-        if CONF_BROADCAST_RESYNC not in self.options:
-            self.options[CONF_BROADCAST_RESYNC] = True
-        if CONF_TRANSITION_MODE not in self.options:
-            self.options[CONF_TRANSITION_MODE] = DEFAULT_TRANSITION_MODE
+        self.options = dict(self.config_entry.options)  # type: ignore
+        self.data = dict(self.config_entry.data)  # type: ignore
+        if CONF_WORKER_COUNT not in self.options:  # type: ignore
+            self.options[CONF_WORKER_COUNT] = 1  # type: ignore
+        if CONF_GENERATE_EVENTS not in self.options:  # type: ignore
+            self.options[CONF_GENERATE_EVENTS] = False  # type: ignore
+        if CONF_BROADCAST_RESYNC not in self.options:  # type: ignore
+            self.options[CONF_BROADCAST_RESYNC] = True  # type: ignore
+        if CONF_TRANSITION_MODE not in self.options:  # type: ignore
+            self.options[CONF_TRANSITION_MODE] = DEFAULT_TRANSITION_MODE  # type: ignore
+        if CONF_AUTO_JOIN_STREAMING not in self.options:  # type: ignore
+            self.options[CONF_AUTO_JOIN_STREAMING] = DEFAULT_AUTO_JOIN_STREAMING  # type: ignore
         return await self.async_step_user()  # type: ignore
 
     def _audio_environments(self) -> list[str]:
@@ -935,7 +1014,10 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
             for i in range(1, CONF_DECODER_SLOTS + 1):
                 entity_key = CONF_DECODER_ENTITY.format(i)
                 source_key = CONF_DECODER_SOURCE.format(i)
+                companion_key = CONF_DECODER_COMPANION.format(i)
                 entity_val = str(user_input.get(entity_key) or "").strip()
+                companion_val = str(user_input.get(companion_key) or "").strip()
+
                 if entity_val:
                     if not entity_val.startswith("media_player."):
                         errors[entity_key] = "not_a_media_player"
@@ -953,16 +1035,33 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
                     else:
                         seen_sources[src_val] = source_key
 
-            limit_model = user_input.get(CONF_NAME, self.data.get(CONF_NAME))
+                if companion_val:
+                    if not entity_val:
+                        errors[companion_key] = "companion_without_decoder"
+                    elif not companion_val.startswith("media_player."):
+                        errors[companion_key] = "not_a_media_player"
+                    else:
+                        comp_entry = registry.async_get(companion_val)
+                        if companion_val == entity_val:
+                            errors[companion_key] = "companion_same_as_decoder"
+                        elif comp_entry and comp_entry.platform == "mass":
+                            errors[companion_key] = "mass_entity_not_allowed"
+                        elif comp_entry and comp_entry.platform == "myhome":
+                            errors[companion_key] = "myhome_entity_not_allowed"
+
+            limit_model = user_input.get(CONF_NAME, self.data.get(CONF_NAME))  # type: ignore
             session_limit = command_session_limit(limit_model)
             if session_limit is not None and int(user_input[CONF_WORKER_COUNT]) > session_limit:
                 errors[CONF_WORKER_COUNT] = "worker_count_above_gateway_limit"
 
             if not errors:
-                self.options.update({CONF_WORKER_COUNT: user_input[CONF_WORKER_COUNT]})
-                self.options.update({CONF_GENERATE_EVENTS: user_input[CONF_GENERATE_EVENTS]})
-                self.options.update({CONF_BROADCAST_RESYNC: user_input.get(CONF_BROADCAST_RESYNC, True)})
-                self.options[CONF_TRANSITION_MODE] = user_input.get(CONF_TRANSITION_MODE, DEFAULT_TRANSITION_MODE)
+                self.options.update({CONF_WORKER_COUNT: user_input[CONF_WORKER_COUNT]})  # type: ignore
+                self.options.update({CONF_GENERATE_EVENTS: user_input[CONF_GENERATE_EVENTS]})  # type: ignore
+                self.options.update({CONF_BROADCAST_RESYNC: user_input.get(CONF_BROADCAST_RESYNC, True)})  # type: ignore
+                self.options[CONF_TRANSITION_MODE] = user_input.get(CONF_TRANSITION_MODE, DEFAULT_TRANSITION_MODE)  # type: ignore
+                self.options[CONF_AUTO_JOIN_STREAMING] = user_input.get(  # type: ignore
+                    CONF_AUTO_JOIN_STREAMING, DEFAULT_AUTO_JOIN_STREAMING
+                )
 
                 # Persist the per-environment default source ("" = leave routing alone)
                 _defaults: dict[str, int] = {}
@@ -983,7 +1082,12 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
                     entity_key = CONF_DECODER_ENTITY.format(i)
                     source_key = CONF_DECODER_SOURCE.format(i)
                     gain_key = CONF_DECODER_PRE_GAIN.format(i)
-                    self.options[entity_key] = str(user_input.get(entity_key) or "").strip()
+                    entity_val = str(user_input.get(entity_key) or "").strip()
+                    self.options[entity_key] = entity_val  # type: ignore
+                    companion_key = CONF_DECODER_COMPANION.format(i)
+                    companion = str(user_input.get(companion_key) or "").strip() if entity_val else ""
+                    if companion or companion_key in self.options:  # type: ignore[operator]
+                        self.options[companion_key] = companion  # type: ignore
                     # Selectors hand back strings/floats; the decoder pool and the
                     # source labels both index on plain ints.
                     self.options[source_key] = int(user_input.get(source_key, i) or i)
@@ -1079,6 +1183,15 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
                     mode=selector.SelectSelectorMode.DROPDOWN,
                 )
             ),
+            vol.Optional(
+                CONF_AUTO_JOIN_STREAMING,
+                description={
+                    "suggested_value": self.options.get(  # type: ignore
+                        CONF_AUTO_JOIN_STREAMING, DEFAULT_AUTO_JOIN_STREAMING
+                    )
+                },
+                default=DEFAULT_AUTO_JOIN_STREAMING,
+            ): selector.BooleanSelector(),
         }
 
         # Matrix source names 1–4 (F441M inputs S1–S4)
@@ -1157,7 +1270,14 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
             else:
                 schema_dict[vol.Optional(entity_key)] = selector.EntitySelector(_decoder_selector_cfg)
 
-            _source_val = int(self.options.get(source_key, i) or i)
+            companion_key = CONF_DECODER_COMPANION.format(i)
+            _companion_val = self.options.get(companion_key, "")  # type: ignore
+            schema_dict[vol.Optional(
+                companion_key,
+                description={"suggested_value": _companion_val} if _companion_val else None,
+            )] = selector.EntitySelector(_decoder_selector_cfg)
+
+            _source_val = int(self.options.get(source_key, i) or i)  # type: ignore
             schema_dict[vol.Required(
                 source_key,
                 default=str(min(max(_source_val, 1), CONF_SOURCE_SLOTS)),
@@ -1189,7 +1309,7 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
             ]
             schema_dict[vol.Optional(
                 CONF_BUS_TOPOLOGY,
-                description={"suggested_value": self.options.get(CONF_BUS_TOPOLOGY, TOPOLOGY_STANDALONE)},
+                description={"suggested_value": self.options.get(CONF_BUS_TOPOLOGY, TOPOLOGY_STANDALONE)},  # type: ignore[attr-defined]
             )] = selector.SelectSelector(
                 selector.SelectSelectorConfig(
                     options=[TOPOLOGY_STANDALONE, TOPOLOGY_SHARED],
@@ -1197,9 +1317,9 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
                     translation_key=CONF_BUS_TOPOLOGY,
                 )
             )
-            suggested_role = self.options.get(CONF_GATEWAY_ROLE)
-            suggested_whos = [str(w) for w in self.options.get(CONF_DELEGATED_WHOS, [])]
-            selected_pri = self.options.get(CONF_PRIMARY_GATEWAY)
+            suggested_role = self.options.get(CONF_GATEWAY_ROLE)  # type: ignore[attr-defined]
+            suggested_whos = [str(w) for w in self.options.get(CONF_DELEGATED_WHOS, [])]  # type: ignore[attr-defined]
+            selected_pri = self.options.get(CONF_PRIMARY_GATEWAY)  # type: ignore[attr-defined]
             if not selected_pri and gw_options:
                 selected_pri = gw_options[0]["value"]
             if selected_pri and (suggested_role is None or not suggested_whos):
@@ -1236,7 +1356,7 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
             )
             schema_dict[vol.Optional(
                 CONF_PRIMARY_GATEWAY,
-                description={"suggested_value": self.options.get(CONF_PRIMARY_GATEWAY)},
+                description={"suggested_value": self.options.get(CONF_PRIMARY_GATEWAY)},  # type: ignore[attr-defined]
             )] = selector.SelectSelector(
                 selector.SelectSelectorConfig(
                     options=gw_options,
@@ -1257,7 +1377,7 @@ class MyhomeOptionsFlowHandler(OptionsFlowWithReload):
 
         return self.async_show_form(
             step_id="user",
-            data_schema=Schema(schema_dict),
+            data_schema=flow_schema(schema_dict),
             errors=errors,
             description_placeholders={
                 "session_limit": str(command_session_limit(limit_model or current_model) or ""),

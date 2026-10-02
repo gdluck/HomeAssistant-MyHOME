@@ -94,16 +94,12 @@ async def load_legacy_myhome_yaml(
                     if CONF_MAC not in gw_val:
                         gw_val[CONF_MAC] = str(gw_key)
                     for plat, devs in gw_val.items():
-                        # climate devices are addressed by `zone` (default "#0");
-                        # the schema has no `where` and rejects the whole file on it.
+                        # climate devices are addressed by `zone` (default "#0"); the schema
+                        # has no `where` for them and rejects the whole file on it.
                         if plat == "climate" or not isinstance(devs, dict):
                             continue
                         for d_key, d_val in devs.items():
-                            if (
-                                isinstance(d_val, dict)
-                                and "where" not in d_val
-                                and "zone" not in d_val
-                            ):
+                            if isinstance(d_val, dict) and "where" not in d_val and "zone" not in d_val:
                                 d_val["where"] = str(d_key)
 
             _validated = validate.config_schema(raw_yaml)

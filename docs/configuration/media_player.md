@@ -9,12 +9,146 @@ This guide explains how to configure and automate the BTicino / Legrand **Diffus
 In MyHOME systems, multi-room audio is managed by dedicated hardware analog matrices and room amplifiers communicating over the SCS bus using **OpenWebNet WHO = 16**.
 
 ### Supported Hardware
-- **Audio Matrix**: F441, F441M (4 audio input sources, up to 8 independent stereo room amplifier outputs)
-- **Room Amplifiers**: 3484, 3484/1, 3487, F500
-- **Audio Controls**: L/N/NT4684, 3529
+- **Audio Matrix**: F441, F441M (4 stereo source inputs S1–S4, up to 8 independent stereo room amplifier environment outputs over the 2-wire SCS bus)
+- **Audio Source Interfaces**: L4561N / L4561 (stereo source interface with RCA line inputs and IR emitter control, 4 DIN modules), L4560 / HS4560 / N4560 / NT4560 / HC4560 (flush-mount modular RCA line-in sockets), 3482 (auxiliary line-in preamplifier / interface), 3495 (source isolator with 1500 Vrms galvanic isolation for ground loop and hum elimination)
+- **FM Tuner Modules**: F500, F500COAX (WHO 16 FM RDS stereo tuner modules, 4 DIN modules)
+- **Room Amplifiers**: H4562, L4562 (flush-mount stereo room amplifiers), F502 (DIN rail stereo room amplifier, 230 Vac powered), 3484, 3484/1, 3487 (modular stereo/mono amplifiers)
+- **Audio Controls & Accessories**: H4651/2, L4651/2 (special controls), HC/HS4563, L/N/NT4563 (rotary controls), HC/HS4653/2, HC/HS4653/3 (soft-touch controls), H/L4684 (colour touchscreen), 3529 (wall control panels), 3499 (bus line terminators), 346000 (SCS bus power supply)
 
 > [!IMPORTANT]
 > **Hardware-Only Analog Matrix**: The BTicino F441 / F441M is a purely analog matrix switcher. It does not contain an Ethernet port or digital audio decoder and cannot stream IP audio by itself. It routes line-level analog signals from physical source inputs (Source 1 to Source 4) to its room outputs, one output per **environment**. Amplifiers are addressed `EA` (`01`–`99`): environment digit, then amplifier number within it.
+
+---
+
+## 🧭 How It Fits Together (Start Here)
+
+New to the audio feature? This section answers the foundational questions that come up first: how physical wiring and SCS bus commands work, why you never group your streamer with a room, and how to expose your zones in Music Assistant. The rest of the page goes into deep architectural and protocol details.
+
+### What is connected to what
+
+```
+Music Assistant / Home Assistant
+        │  1. Play, pause, volume target the ROOM entity: media_player.<room> (e.g. Bathroom)
+        ▼
+MyHOME Dynamic Proxy
+        ├──► OpenWebNet WHO=16 over 2-wire SCS Bus (CONTROL)
+        │       ├── Routes matrix environment output to matrix input S1..S4
+        │       └── Wakes & powers room amplifier ──► Speakers
+        │
+        └──► Claims free decoder & sends stream URL over IP
+                ▼
+        Network Streamer / Decoder (WiiM, Squeezelite, Cambridge Audio, DLNA...)
+                │  Analog stereo line out (RCA / 3.5mm jack)
+                ▼
+        Audio Source Interface (Legrand / BTicino L4561N, 3482, L4560)
+                │  2-wire SCS Bus (modulates stereo audio onto the bus)
+                ▼
+        F441 / F441M Audio Matrix (Source Inputs S1..S4)
+                │  2-wire SCS Bus per Environment (carries audio + commands)
+                ▼
+        Room Amplifiers (H4562, F502, 3484/3487)
+                │  Local speaker wires (L / R)
+                ▼
+        Room Speakers
+```
+
+| Part | What it does | Connection |
+|---|---|---|
+| **Streamer ("decoder")** | Receives the stream from Music Assistant or Home Assistant over IP and converts it into analog line-level audio. | Ethernet / Wi-Fi network in; analog stereo line-level out (RCA / 3.5mm). |
+| **Audio source interface (L4561N / 3482 / L4560)** | Accepts line-level stereo analog audio from the streamer and modulates it onto the 2-wire SCS bus to a matrix source input (S1–S4); provides presence signaling on the SCS bus. | Analog line audio in; 2-wire SCS bus connection to matrix source input (S1–S4). |
+| **Source isolator (3495)** | Optional galvanic isolator (1500 Vrms) installed between streamer and source interface for Class I or multiple Class II devices to eliminate 50/60 Hz ground loops and hum. | RCA IN from streamer; RCA OUT to source interface. |
+| **F441 / F441M matrix** | Switches one of its four 2-wire SCS stereo source inputs (S1–S4) to each room environment output over the 2-wire SCS bus. It has no network audio. | 2-wire SCS inputs (S1–S4) from source interfaces; 2-wire SCS outputs to room environments. |
+| **Room amplifiers (H4562, F502, 3484/3487)** | Receives both digital OpenWebNet control frames and modulated stereo audio over the 2-wire SCS bus; powers the room speakers. | Switched on, off and volume-regulated over the 2-wire SCS bus; audio demodulated from the same 2-wire SCS bus; local copper speaker wires (L/R) to speakers. |
+| **MyHOME integration** | Ties the three together: wakes the amplifier, routes the room, forwards the stream to a free streamer. | Gateway (SCS bus) and Home Assistant service calls. |
+
+---
+
+<a id="the-2-wire-question-control-vs-audio-stereo-sound"></a>
+<a id="the-2-wire-architecture-audio-and-control-over-the-scs-bus"></a>
+### The 2-Wire Architecture: Audio & Control Multiplexing & Stereo Sound
+
+A common question is: ***"How can you have stereo sound with only 2 wires, and why do I need an audio interface like the L4561N?"***
+
+- **Audio and commands travel together over the same 2-wire SCS bus.** In BTicino MyHOME **Diffusion Sonore 2 Fils** (2-Wire Sound System), the physical 2-wire SCS bus (white/grey twisted pair) simultaneously carries **27V DC power**, **digital OpenWebNet control frames** (WHO = 16: power, volume, source routing, FM frequency tuning), and **high-frequency modulated stereo audio** across the very same two conductors. There is no separate analog audio cabling running between the matrix and the room amplifiers; the 2-wire SCS bus carries the music directly to each room.
+- **Why an audio source interface is required for external streamers.** External network streamers (WiiM, Squeezelite/Raspberry Pi, DLNA DACs, Cambridge Audio, CD players, etc.) output standard baseband analog line-level stereo audio (0.7–2.0 V RMS via RCA or 3.5mm jack). They cannot connect directly to SCS bus screw terminals. A Legrand / BTicino audio source interface—such as the **L4561N / L4561** (4-DIN stereo control module with RCA inputs and IR emitter output), **L4560 / HS4560 / N4560 / NT4560 / HC4560** (modular flush-mount RCA sockets), or **3482** (auxiliary line-in preamplifier)—is the physical bridge that takes line-level stereo analog audio and modulates/injects it directly onto the 2-wire SCS bus into one of the matrix source inputs (S1–S4).
+- **Galvanic isolation (art. 3495) for ground loops & hum.** When connecting external Class I audio sources (equipment with an earth ground connection, such as a desktop PC or earthed Hi-Fi amplifier) or multiple Class II sources, BTicino strongly recommends placing a **3495** source isolator between the streamer and the source interface. It provides 1500 Vrms isolation to preserve the SELV safety rating of the MyHOME SCS bus and prevent 50/60 Hz ground hum.
+- **Stereo distribution and speaker wiring.** The F441 / F441M matrix and SCS audio bus transmit a true stereo (L/R) signal. Each room environment ("Ambiance") is wired with a single 2-wire SCS bus daisy-chained across room amplifiers (e.g. flush-mount **H4562 / L4562** or DIN rail **F502**) and control panels (**H4651/2**, **H4684**), ending at a **3499** bus termination resistor. The amplifier in the room demodulates the stereo signal and drives the room's speakers over standard local copper speaker wire (Left and Right).
+
+<a id="official-bticino-2-wire-sound-system-wiring-schematic"></a>
+#### Official BTicino 2-Wire Sound System Wiring Schematic
+
+The schematic below from the official BTicino MyHOME Diffusion Sonore documentation illustrates how external stereo audio sources, the F441 matrix, and multi-room environment zones all interconnect using the 2-wire SCS bus:
+
+![BTicino MyHOME Diffusion Sonore 2 Fils Wiring Schematic](../images/bticino-sound-system-schematic.jpg)
+*Figure: Official BTicino MyHOME Diffusion Sonore 2 Fils system architecture and wiring schematic (from catalog 3495). At the bottom: audio sources (F500 RDS tuner, Hi-Fi via L4561 stereo control and 3494 connector, external RCA input via HS4560 and 3495 source isolator) connect to matrix inputs over the 2-wire SCS bus. In the center: F441 matrix and 346000 power supply. At the top: four room environments (Ambiance 1–4) receive 2-wire SCS bus lines driving flush-mount amplifiers (H4562), DIN amplifiers (F502), special controls (H4651/2), and touchscreens (H4684), terminated with 3499 bus line terminators.*
+
+---
+
+### Setting it up, step by step
+
+1. **Cable the hardware:** Connect the analog line output of each streamer into an audio source interface (e.g. L4561N, 3482, or L4560) connected to a free F441/F441M source input (S1–S4).
+2. **Add the streamer to Home Assistant:** Use its native integration (for example Squeezelite via Music Assistant's Slimproto provider, WiiM, Cast, or DLNA DMR). It must show up as an active `media_player` entity.
+3. **Configure MyHOME Options:** Open **Settings → Devices & Services → MyHOME → Configure**:
+   - **Source names** (*Source 1*–*Source 4*): name what is physically wired to each input (e.g. `S1 — WiiM Streamer`) and leave unused inputs blank.
+   - **Default source per environment** (optional): set which source a room starts on when switched on.
+   - **Decoder rows** (up to 4): map each streamer's `media_player` entity to its matrix input (S1–S4), and set an optional pre-gain offset (e.g. `+15%`). See [Gain Staging](#gain-staging-bus-noise-elimination).
+   > [!NOTE]
+   > Mapping at least one decoder in this step is what unlocks streaming support (`play_media`) on your MyHOME room entities.
+4. **Check the room entities:** Each amplifier zone appears as a `media_player` entity under the MyHOME gateway.
+5. **Set up Music Assistant:**
+   - Add the **Home Assistant Player Provider** in Music Assistant (**Settings → Providers → Add Provider → Home Assistant**).
+   - Under provider settings, select and enable your MyHOME room amplifier entities (`media_player.<room>`).
+   - For smooth multi-room listening across the whole house, create a [Sync Group](#recommended-one-music-assistant-sync-group-for-the-house) with **Dynamic members ON**.
+6. **Dashboard:** The stock `media-control` and `tile` cards work directly on the room entities. See [Dashboard Display](#dashboard-display-lovelace-speaker-cards) for ready-made cards, including dynamic cards that only display actively playing rooms.
+
+---
+
+### Streamer vs. Room Zone: Never Group the Streamer with a Room
+
+Another frequent question is: ***"My streamer is `Livingroom 1_3519`, but I want to listen in the Bathroom. Should I create a group containing `Livingroom 1_3519` and `Bathroom` so both play?"***
+
+> [!CAUTION]
+> **NEVER group your backend streamer with a destination room in Music Assistant or Home Assistant.**
+
+Here is why and how the Dynamic Proxy architecture works:
+
+1. **Understand the distinct roles:**
+   - **Backend Streamer / Decoder** (e.g., `media_player.livingroom_1_3519`, WiiM, Squeezelite): This is the physical hardware audio streamer plugged into the matrix input. It is registered in the **MyHOME Decoder Pool** (via **Configure → Decoders**). It serves as an internal audio feeder. You do **not** target it for playback, and you do **not** add it to speaker groups.
+   - **Destination Room** (e.g., `media_player.bathroom_sound`): This is the BTicino room amplifier powering the speakers in that room.
+2. **How to play music in a room (e.g. Bathroom):**
+   - Simply select the **Bathroom** player in Music Assistant (or Home Assistant) and press play!
+   - You do **not** touch or select `Livingroom 1_3519`.
+   - Behind the scenes, the MyHOME integration automatically:
+     - Claims a free streamer (`Livingroom 1_3519`) from the pool.
+     - Wakes and powers on the Bathroom amplifier over the SCS bus.
+     - Routes the Bathroom environment to Source 1 on the F441/F441M matrix.
+     - Streams the audio URL to `Livingroom 1_3519`.
+     - Mirrors the track title, artist, album art, and volume back onto `media_player.bathroom_sound`.
+3. **What happens if you group the streamer with the room:**
+   - Music Assistant attempts to stream simultaneously to both the physical streamer (`Livingroom 1_3519`) and the virtual room proxy (`Bathroom`). This causes duplicated streams, desynchronized playback, queue collisions, or feedback loops.
+4. **When do you use groups?**
+   - Groups are used **only** when you want to play the same audio across **multiple destination rooms at the same time** (e.g., `Bathroom` + `Kitchen` + `Living Room`).
+   - Even in a multi-room group: **only add the MyHOME room entities — never add the backend streamer!**
+
+---
+
+### Exposing MyHOME Rooms in Music Assistant (Home Assistant Player Provider)
+
+If Music Assistant does not list your MyHOME amplifier rooms:
+
+1. **Add the Player Provider:** Music Assistant does not expose Home Assistant media players automatically. In Music Assistant, navigate to **Settings → Providers → Add Provider → Home Assistant (Player Provider)**.
+2. **Connect to Home Assistant:** Provide your Home Assistant URL and token (or confirm the auto-discovered connection).
+3. **Enable MyHOME Rooms:** Under the player provider settings, select and enable the MyHOME room amplifier entities (`media_player.<room>`) you want to use.
+4. **Configure Decoders in MyHOME:** A MyHOME room entity only advertises `play_media` (streaming support) once at least one decoder is mapped in the MyHOME integration options (**Settings → Devices & Services → MyHOME → Configure → Decoders**). If no decoders are configured, the room operates in standalone fallback mode (volume/source only) and Music Assistant will not accept stream commands for it.
+
+---
+
+### Choosing a streamer & Bluetooth considerations
+
+Any network streamer with an analog output works as long as Home Assistant can play a stream URL on it. A wired network connection is the most reliable (such as a Raspberry Pi running Squeezelite/piCorePlayer, WiiM Pro, or Cambridge Audio).
+
+> [!WARNING]
+> **Avoid Bluetooth for Streamers**: Attempting to use a Raspberry Pi or other device as an audio source via Bluetooth often leads to choppy audio, dropouts, and stutter. This is caused by RF interference (especially if the device sits near a Wi-Fi router) and Bluetooth audio stack latency. Bluetooth sources are outside what this integration manages. A wired or networked streamer connected to the audio source interface is strongly recommended. See also [Backend Stream Compatibility](#backend-stream-compatibility-dlna-dmr-cambridge-audio-wiim-squeezelite).
 
 ---
 
@@ -32,20 +166,25 @@ To bridge modern streaming platforms (such as **Music Assistant**, **Spotify Con
          ┌───────────────────────────┐
          │ Decoder Pool Management   │
          │ - Dynamic claim / release │
-         │ - Gain staging (+12 dB)   │
+         │ - Pre-gain (% offset)     │
          │ - State & metadata mirror │
          └─────┬───────────────┬─────┘
                │               │
-      [IP Service Call]   [OpenWebNet SCS Bus]
-               │               │
+      [IP Service Call]   [OpenWebNet WHO 16 Control]
+               │               │ (Power, Volume, Routing)
                ▼               ▼
        ┌───────────────┐ ┌───────────────┐
-       │ Audio Streamer│ │ F441M Matrix  │
-       │ (Squeezelite /│ │ & Amplifiers  │
-       │  WiiM / Pi)   │ │ (01..99)      │
+       │ Audio Streamer│ │ F441 / F441M  │
+       │ (WiiM / Pi /  │ │ Audio Matrix  │
+       │  Cambridge)   │ │ & Amplifiers  │
        └───────┬───────┘ └───────▲───────┘
-               │ Analog Line-In  │
-               └─────────────────┘
+               │ Analog Line-Out │
+               ▼                 │ 2-Wire SCS Audio Bus
+       ┌───────────────┐         │ (Inputs S1..S4)
+       │ Audio Source  ├─────────┘
+       │ Interface     │
+       │ (L4561N/3482) │
+       └───────────────┘
 ```
 
 ### Source switching
@@ -193,6 +332,16 @@ $$\text{Decoder Volume} = \text{Zone Volume} + \text{Pre-Gain Offset}$$
 - Setting `pre_gain` (e.g., `+10%` to `+20%`) drives the network streamer at maximum undistorted line level.
 - The room amplifier then operates at lower amplification, pushing the analog noise floor below audibility.
 
+### A volume of 0 is not a mute
+
+Turning a room down to 0, from Music Assistant or a wall panel, leaves it
+unmuted: only the mute button mutes. Music Assistant greys out the slider of a
+muted player and leaves it out of the group volume, so a room that reports 0
+would otherwise be stuck there until you pressed the mute icon. Raising the
+volume above 0 (from anywhere) ends a mute. A volume of 0 does not affect the
+anti-hiss auto-off, which only follows the decoder: when the stream stops, the
+room's amplifier still switches off.
+
 ---
 
 ## ⚙️ Configuration via Home Assistant UI
@@ -217,8 +366,8 @@ empty keeps the wall-panel routing in charge.
 > [!WARNING]
 > **Avoid Recursive Loops**: Do NOT select a Music Assistant virtual player as the backend decoder entity. The backend decoder must be the actual hardware device (e.g. `media_player.squeezelite_salon`, `media_player.wiim_dining`), while Music Assistant targets the MyHOME zone entity.
 
----
-
+<a id="multi-room-audio-grouping-music-assistant-home-assistant"></a>
+<a id="multi-room-audio-grouping-music-assistant--home-assistant"></a>
 ## 👥 Multi-Room Audio Grouping (Music Assistant & Home Assistant)
 
 The MyHOME integration implements native Home Assistant player grouping (`MediaPlayerEntityFeature.GROUPING`). This enables synchronized multi-room playback across BTicino audio zones without playing separate concurrent audio streams.
@@ -310,6 +459,9 @@ To stream seamlessly to Cambridge Audio network players:
 2. In Home Assistant, install the **DLNA Digital Media Renderer** integration. It will automatically discover your Cambridge Audio streamer (e.g. `media_player.cxn_v2_dlna`).
 3. In **Settings** -> **Devices & Services** -> **MyHOME** -> **Configure**, map the DLNA DMR entity as your decoder instead of the native `cambridge_audio` entity.
 
+> [!TIP]
+> **Streaming companion**: each decoder slot has an optional **Streaming companion** field. Leave it empty and MyHOME looks for the DLNA / UPnP / Cast renderer of the same device, then of the same MAC, then of the same host, then of a device with exactly the same name. If a step finds several different devices (two identical streamers in the rack) MyHOME does not guess: it raises the *Several streaming companions found* repair and keeps that decoder off streams until you pick the entity here. Control and volume always stay on the decoder entity; only stream URLs go to the companion.
+
 > [!NOTE]
 > **Automatic Diagnostic & Repair**:
 > If you select a `cambridge_audio` entity in MyHOME Options, the integration issues a **Home Assistant Repair Issue** as soon as the options are saved, explaining that DLNA DMR is required and linking to the documentation.
@@ -337,8 +489,8 @@ If you do not configure any streaming decoders in the Options Flow, the room amp
 Play, pause, stop and next / previous track are only offered once a decoder is
 configured; they are forwarded to that decoder, not sent on the bus.
 
----
-
+<a id="dashboard-display-lovelace-speaker-cards"></a>
+<a id="-dashboard-display-lovelace-speaker-cards"></a>
 ## 📊 Dashboard Display (Lovelace Speaker Cards)
 
 You can monitor and control BTicino audio zones using native Home Assistant cards or dynamic community cards.
@@ -406,6 +558,25 @@ filter:
 
 ---
 
+## 🩺 Reporting an audio problem
+
+Audio problems usually involve three parties (this integration, Music Assistant
+and the decoder), so a report needs two files and one sentence:
+
+1. **MyHOME diagnostics**: *Settings → Devices & services → MyHOME → ⋮ → Download diagnostics*.
+   Its `audio` block lists every zone (state, source, volume, mute, whether the
+   anti-hiss auto-off has parked it), the decoders (source, pre-gain, state, who
+   holds them) and the groups. Rooms appear as `zone_<bus address>` and decoders
+   as `decoder_<slot>`, so it carries no room names. The `bus_monitor` block holds
+   the last frames on the bus.
+2. **Music Assistant log**, only when the problem is on the Music Assistant side
+   (group does not form, wrong player, slider locked): *Settings → System → Logs*
+   in Music Assistant, around the time it happened.
+3. What you did, and when: "21:48, pressed play on the *Huis* group, Bureau's
+   slider would not move."
+
+Attach these to the issue instead of pasting log excerpts; two files are enough.
+
 ## 📜 OpenWebNet WHO = 16 Reference Frames
 
 `<WHERE>` is an amplifier (`01`–`99`), an environment (`#0`–`#9`) or `0` for
@@ -422,5 +593,16 @@ all amplifiers. The integration addresses individual amplifiers.
 | **Activate Source `S`** | `*16*3*10S##` | Switches source device `S` on (`101`–`109`). |
 | **Route Environment to Source** | `*16*3*1ES##` | Routes every amplifier of environment `E` to source `S`. Not in `WHO_16.pdf`; established from bus captures on two installations. |
 
-> Released OWNd builds volume down as `*16*1000*<WHERE>##`, which the
-> specification does not define; the library fix is pending.
+> OWNd 2.0.0b8 and earlier send volume down as `*16*1000*<WHERE>##`, which the
+> specification does not define; OWNd 2.0.0b9 sends `*16*1101*<WHERE>##`.
+
+### Checks worth running on a new plant
+
+Grouping, parking and volume are where Music Assistant and the analog matrix meet, so a plant counts as verified once these hold (attach the diagnostics file to the issue, see above):
+
+1. Play to the Music Assistant Sync Group, add a third room, then drop the leader. The matrix and the Music Assistant queue stay in step, and no room falls silent for longer than the leader-handover gap.
+2. Set one member of the group to volume 0, then raise it again. The slider does not lock.
+3. Let the anti-hiss auto-off silence the house, then press play. The parked members come back as a group.
+4. With a Cambridge decoder, the diagnostics show a `companion` that is the DLNA/UPnP renderer, never a `mass` clone.
+
+Use the **Audio field report** issue template so the result can be turned into a replay test.

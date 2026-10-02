@@ -87,11 +87,18 @@
       "primary_gateway_not_found": "La passerelle principale sélectionnée est introuvable."
     },
     "abort": {
-      "discover_timeout": "Impossible de découvrir des serveurs MyHome",
+      "discovery_timeout": "Impossible de découvrir des serveurs MyHome",
       "no_gateways": "Aucun serveur MyHome découvert",
       "all_configured": "Tous les serveurs MyHome sont déjà configurés",
       "unknown": "Une erreur inconnue s'est produite",
       "cannot_connect": "Connexion au serveur impossible",
+      "connection_closed": "La passerelle a fermé la connexion pendant la configuration. Elle est peut-être occupée, sans session disponible, nécessite un redémarrage, ou filtre les adresses IP autorisées.",
+      "connection_refused": "La passerelle a refusé la demande de connexion.",
+      "connection_error": "Erreur de communication lors de la connexion à la passerelle.",
+      "negotiation_timeout": "La passerelle n'a pas répondu à temps lors de la négociation de la session.",
+      "negotiation_failed": "La négociation de la session avec la passerelle a échoué.",
+      "negotiation_refused": "La passerelle a refusé la négociation de la session.",
+      "negotiation_error": "Erreur de négociation d'authentification de la passerelle.",
       "already_configured": "Ce serveur est déjà configuré",
       "already_in_progress": "Le flux de configuration pour le pont est déjà en cours",
       "reauth_successful": "Changement de mot de passe réussi",
@@ -312,7 +319,7 @@
       "title": "Le décodeur {decoder} utilise une intégration non prise en charge ({platform})"
     },
     "gateway_authentication_failed": {
-      "title": "Échec de l'authentification de la passerelle",
+      "title": "Échec de l'authentification de la passerelle MyHOME {gateway}",
       "description": "La passerelle a rejeté les informations d'identification OpenWebNet. Veuillez reconfigurer le mot de passe."
     },
     "bus_collision_storm": {
@@ -321,7 +328,7 @@
     },
     "gateway_identity_mismatch": {
       "title": "Incohérence du modèle de passerelle pour {configured}",
-      "description": "La passerelle est configurée comme {configured} mais signale le type OpenWebNet {code}, identifiant {reported} selon {basis}."
+      "description": "La passerelle est configurée comme {configured} (source : {source}) mais signale le type OpenWebNet {code}, identifiant {reported} selon {basis}."
     },
     "gateway_identity_corrected": {
       "title": "Modèle de passerelle corrigé en {corrected}",
@@ -403,7 +410,7 @@
       "message": "{entity_id} : source inconnue « {source} »"
     },
     "environment_busy": {
-      "message": "{entity_id} : {owner} diffuse déjà dans l'environnement {environment} ; les zones d'un même environnement partagent une entrée de la matrice"
+      "message": "{entity_id} : {owner_name} diffuse déjà dans l'environnement {environment} ; les zones d'un même environnement partagent une entrée de la matrice (également utilisée par : {rooms})"
     },
     "routing_unsupported": {
       "message": "{entity_id} : l'amplificateur {where} n'a pas d'adresse de routage dans la matrice (environnement 0, ou amplificateur non à deux chiffres) ; changez sa source depuis un panneau mural"

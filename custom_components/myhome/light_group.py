@@ -179,15 +179,14 @@ class MyHOMELightGroup(MyHOMEEntity, LightEntity):
         dim = getattr(msg, "dimension", None)
         vals = getattr(msg, "_dimension_value", [])
         if dim == 1 and vals:
-            # Dimension 1 carries ``level + 100`` on the bus (``150`` is 50 %);
-            # OWNd decodes it for events, the echoed group write is raw.
-            pct = getattr(msg, "brightness", None) if isinstance(msg, OWNLightingEvent) else None
-            if pct is None:
-                pct = int(vals[0]) - 100
-            pct = max(0, min(100, int(pct)))
-            self._attr_brightness = percent_to_eight_bits(pct)
-            if pct > 0:
-                self._last_brightness_pct = pct
+            # Dimension 1 carries ``level + 100`` on the bus (``150`` is 50 %); anything
+            # outside 100..200 is not a level.
+            raw = int(vals[0])
+            if 100 <= raw <= 200:
+                pct = raw - 100
+                self._attr_brightness = percent_to_eight_bits(pct)
+                if pct > 0:
+                    self._last_brightness_pct = pct
         elif dim == 14 and vals and int(vals[0]) > 1:
             self._attr_color_temp_kelvin = int(1000000 / int(vals[0]))
         elif dim == 12 and len(vals) >= 3:

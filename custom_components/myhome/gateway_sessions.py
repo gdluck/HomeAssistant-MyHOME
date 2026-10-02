@@ -265,6 +265,7 @@ class EventSessionRunner:
         self._terminate_listener = True
         self._event_session_ready.set()
         if self._event_watchdog is not None:
+            # An expired timeout cannot be rescheduled; unload racing the stall lands here.
             if not self._event_watchdog.expired():
                 self._event_watchdog.reschedule(None)
             self._event_watchdog = None

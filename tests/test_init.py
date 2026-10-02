@@ -143,7 +143,7 @@ async def test_unload_entry_keeps_state_when_platform_unload_fails(hass: HomeAss
 
 
 async def test_setup_yaml(hass: HomeAssistant):
-    """A stray `myhome:` key is ignored: returning False would stop every config entry from loading."""
+    """A `myhome:` key is ignored; it must not keep the config entries from loading (#566)."""
     from custom_components.myhome import async_setup
     result = await async_setup(hass, {DOMAIN: {}})
     assert result

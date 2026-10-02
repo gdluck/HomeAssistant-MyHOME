@@ -176,8 +176,8 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     await async_setup_services(hass)
 
     if DOMAIN in config:
-        # config_entry_only_config_schema already raised the repair issue; the
-        # config entries must still load.
+        # config_entry_only_config_schema already raised the repair issue; returning
+        # False here would keep every config entry from loading.
         LOGGER.warning("configuration.yaml is not supported for this component; the key is ignored.")
 
     return True
@@ -356,14 +356,12 @@ async def async_remove_config_entry_device(
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: MyHOMEConfigEntry) -> None:
-    """Drop what a removed gateway leaves behind: its store, its repair issues,
-    and the secondary/standby gateways it was the primary of (#453)."""
+    """Drop what a removed gateway leaves behind: its store, its repair issues, and
+    flag the secondary/standby gateways it was the primary of (#453)."""
     await decoder_pool_store(hass, entry.entry_id).async_remove()
     issue_registry = ir.async_get(hass)
     for domain, issue_id in list(issue_registry.issues):
-        if domain == DOMAIN and (
-            issue_id.endswith(f"_{entry.entry_id}") or f"_{entry.entry_id}_" in issue_id
-        ):
+        if domain == DOMAIN and (issue_id.endswith(f"_{entry.entry_id}") or f"_{entry.entry_id}_" in issue_id):
             ir.async_delete_issue(hass, DOMAIN, issue_id)
     async_check_primary_links(hass, removed=entry.entry_id)
 

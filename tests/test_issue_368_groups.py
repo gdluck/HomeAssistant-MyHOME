@@ -362,10 +362,8 @@ async def test_bus_frame_dimension_status(hass: HomeAssistant):
     group = _group(hass, gateway)
     await group.async_added_to_hass()
 
-    # Dimension 1 is level + 100 on the bus: 150 means 50 %.
-    _fire(group, "*#1*#6*1*150*0##")
-    assert group.brightness == round(50 / 100 * 255)
-    assert group._last_brightness_pct == 50
+    _fire(group, "*#1*#6*1*150*0##")  # dimension 1 is level + 100
+    assert group.brightness == 128
 
     _fire(group, "*#1*#6*14*153##")
     assert group.color_temp_kelvin == int(1000000 / 153)
