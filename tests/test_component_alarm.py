@@ -363,6 +363,23 @@ class TestMyHOMEAlarmEntity:
         cmd_zone1 = OWNAlarmCommand.status("1")
         assert str(cmd_zone1) == "*#5*#1##"
 
+    def test_handle_event_armed_home_state(self, alarm_central):
+        # OWNd <= 2.0.0b9 (the pinned release) reads system WHAT 11 as armed_home;
+        # OWNd#66+ treats it as zone-only and never produces one, so the mapping is
+        # checked on the predicate itself rather than on a parsed frame.
+        msg_home = MagicMock(
+            is_alarm=False,
+            is_armed_away=False,
+            is_armed_home=True,
+            is_disarmed=False,
+            state_code=11,
+            state_name="active zone",
+        )
+        alarm_central.handle_event(msg_home)
+        assert alarm_central.alarm_state == STATE_ARMED_HOME
+        assert alarm_central.extra_state_attributes["raw_state"] == "active zone"
+        assert alarm_central.extra_state_attributes["state_code"] == 11
+
     def test_handle_event(self, alarm_central):
         # Disarmed event (*5*2*0## - deactivation)
         msg_disarmed = OWNEvent.parse("*5*2*0##")

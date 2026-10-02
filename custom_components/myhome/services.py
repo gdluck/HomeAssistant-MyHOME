@@ -23,6 +23,7 @@ from .const import (
     SERVICE_TURN_ON_TIMED,
 )
 from .data import get_runtime_data
+from .typing_compat import as_any
 
 if TYPE_CHECKING:
     from .gateway import MyHOMEGatewayHandler
@@ -35,7 +36,7 @@ SERVICE_SWEEP_BUS = "sweep_bus"
 
 #: Fields of ``myhome.turn_on_timed`` (services.yaml); the light entity uses the
 #: brightness fields, the switch entity accepts and ignores them.
-TURN_ON_TIMED_SCHEMA: dict[str | vol.Marker, Any] = {
+TURN_ON_TIMED_SCHEMA: dict[vol.Marker, Any] = {
     vol.Optional("duration"): vol.Coerce(float),
     vol.Optional("hours", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=255)),
     vol.Optional("minutes", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=59)),
@@ -74,7 +75,7 @@ def _register_turn_on_timed(hass: HomeAssistant) -> None:
         entities=entities,
         func="async_turn_on_timed",
         job_type=None,
-        schema=TURN_ON_TIMED_SCHEMA,
+        schema=as_any(TURN_ON_TIMED_SCHEMA),
     )
 
 
