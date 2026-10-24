@@ -556,6 +556,15 @@ class MyHOMEClimate(MyHOMEEntity, ClimateEntity):
                 cast(OWNCommand, OWNHeatingCommand.parse(f"*#4*{self._full_where}*11##"))
             )
         if self._humidity:
+            if getattr(self._gateway_handler, "humidity_request_refused", False) is True:
+                # F450, F453, F453AV, F454, H4684, MH200, MH200N and MH202 drop the request
+                # (firmware oracle); the zone's own pushes keep the humidity fresh.
+                LOGGER.debug(
+                    "%s Zone %s: this gateway refuses humidity requests; waiting for its pushes",
+                    self._gateway_handler.log_id,
+                    self._full_where,
+                )
+                return
             await self._gateway_handler.send_status_request(
                 cast(OWNCommand, OWNHeatingCommand.parse(f"*#4*{self._full_where}*60##"))
             )
