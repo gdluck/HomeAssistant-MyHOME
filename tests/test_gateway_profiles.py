@@ -167,7 +167,7 @@ def test_generate_gateway_discovery_table_and_verify_oracle():
     assert ugp.DISCOVERY_END_MARKER in block
     assert "| **F454** | WHO 1, 2, 4, 16, 18 |" in block
     assert "| **F452 / F453 / F453AV** | WHO 1, 2, 4, 16, 18 |" in block
-    assert "| **F461** | WHO 1, 2, 4, 16, 18 |" in block
+    assert "| **F461** | WHO 1, 2, 4, 18 |" in block
     assert "| **F455** | WHO 1, 2, 4, 18 |" in block
     assert "| **MH200 / MH200N** | WHO 1, 2, 4, 16 |" in block
 

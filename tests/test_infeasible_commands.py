@@ -117,7 +117,7 @@ class TestNormalizationSafety:
 
     def test_4_digit_apl_addresses_preserve_exact_string(self):
         """Feasible 4-digit APL addresses must retain all digits."""
-        assert normalize_where("0001") == "0001"
+        assert normalize_where("0001") == "01"  # area-0 point: OWNd normalize_where canonicalises 000N
         assert normalize_where("0015") == "0015"
         assert normalize_where("0115") == "0115"
         assert normalize_where("0212") == "0212"

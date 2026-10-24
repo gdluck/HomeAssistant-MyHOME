@@ -206,8 +206,8 @@ GATEWAY_DISCOVERY_METADATA: list[dict[str, object]] = [
     {
         "model": "**F461**",
         "profile_name": "F461",
-        "queried_whos": [1, 2, 4, 16, 18],
-        "notes": "Lighting, cover, climate, sound (unmeasured class default), and energy meter 51 queries. Alarm query omitted.",
+        "queried_whos": [1, 2, 4, 18],
+        "notes": "Lighting, cover, climate, and energy meter 51 queries. Sound is WHO 22 only (no `bt_difson`; every WHO 16 frame refused), alarm query omitted.",
     },
     {
         "model": "**F455**",
@@ -218,8 +218,8 @@ GATEWAY_DISCOVERY_METADATA: list[dict[str, object]] = [
     {
         "model": "**MyHomeServer1**",
         "profile_name": "MyHomeServer1",
-        "queried_whos": [1, 2, 4, 16, 18],
-        "notes": "Lighting, cover, climate, sound (unmeasured class default), and energy meter 51 queries. Alarm query omitted.",
+        "queried_whos": [1, 2, 4, 18],
+        "notes": "Lighting, cover, climate, and energy meter 51 queries. Sound is WHO 22 only (no `bt_difson`; every WHO 16 frame refused), alarm query omitted.",
     },
     {
         "model": "**MH201**",
