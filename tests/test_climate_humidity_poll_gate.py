@@ -89,7 +89,9 @@ async def test_f461_zone_still_asks_for_its_humidity(hass):
 async def test_refusing_gateway_zone_does_not_ask(hass, model):
     handler = _handler(hass, model)
     await _humidity_zone(hass, handler).async_update()
-    assert _sent(handler) == []
+    # F454 and MH202 are SCS-only gateways that refuse *#4*0##, so the zone asks for its own
+    # temperature (*#4*2*0##, #794); the humidity request is what must stay out.
+    assert [frame for frame in _sent(handler) if frame.endswith("*60##")] == []
 
 
 async def test_gateway_without_the_property_is_still_asked(hass):
