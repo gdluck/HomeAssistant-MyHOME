@@ -160,6 +160,20 @@ ACTUATOR_REQUEST_REFUSED = frozenset({"F453", "F453AV", "H4684", "MH200", "MH200
 # One request for every zone, by dimension. The live F461 2.0.11 answered ``*#4*#0*20##`` with
 # the actuators of each zone (``*#4*2#1*20*0##``, ``*#4*2#2*20*5##`` after 2.1 s).
 ALL_ZONE_REQUESTS: dict[str, dict[int, str]] = {"F461": {20: "*#4*#0*20##"}}
+# Startup requests the firmware drops instead of forwarding them to the bus (own-firmware-oracle,
+# results/mcp_index.json at 53f9514; "silent" verdicts). Read from the OWNd profile first
+# (``supports_general_heating_status``, ``supports_who(16)``); these tables are the fallback
+# until the flags exist there. Gateways not listed keep sending the request.
+GENERAL_ZONE_REQUEST_REFUSED = frozenset(
+    {"F450", "F454", "F459", "F460", "F461", "H4684", "MH200", "MH202", "MYHOMESERVER1"}
+)  # *#4*0## (trace-corpus.tsv); F453, F453AV and MH200N forward it
+SOUND_STATUS_REQUEST_REFUSED = frozenset(
+    {"F450", "F459", "F460", "F461", "MH202", "MYHOMESERVER1"}
+)  # *#16*0*5## (sound-who16-source.tsv)
+# Zones of these SCS-only gateways report nothing after the startup sweep, so each zone asks
+# for its temperature (*#4*Z*0##): the ones refusing *#4*0##, and the MH201, whose standalone
+# thermostats stayed unknown after every restart (#185). MH201 is not in the oracle.
+ZONE_TEMPERATURE_POLL = GENERAL_ZONE_REQUEST_REFUSED | {"MH201"}
 
 
 class MyHOMEGatewayHandler(GatewayTopologyMixin, GatewayIdentityMixin):
@@ -435,6 +449,32 @@ class MyHOMEGatewayHandler(GatewayTopologyMixin, GatewayIdentityMixin):
             await self.send_paced(frames)
 
     @property
+    def general_zone_request_refused(self) -> bool:
+        """Whether this gateway drops the general heating status request (``*#4*0##``)."""
+        supported = getattr(getattr(self.gateway, "profile", None), "supports_general_heating_status", None)
+        if isinstance(supported, bool):
+            return not supported
+        return self._model_key in GENERAL_ZONE_REQUEST_REFUSED
+
+    @property
+    def sound_status_request_refused(self) -> bool:
+        """Whether this gateway drops the sound status request (``*#16*0*5##``)."""
+        if not self._profile_supports_who(16):
+            return True
+        return self._model_key in SOUND_STATUS_REQUEST_REFUSED
+
+    @property
+    def zone_temperature_poll_needed(self) -> bool:
+        """Whether each zone must ask for its temperature (``*#4*Z*0##``) itself.
+
+        Only on SCS-only gateways (no ``*#4*Z##``) whose startup sweep brings no zone
+        temperature; elsewhere the zone status poll or the sweep reports it.
+        """
+        if self.supports_zone_status:
+            return False
+        return self.general_zone_request_refused or self._model_key in ZONE_TEMPERATURE_POLL
+
+    @property
     def profile(self) -> Any:
         """Return gateway profile."""
         return self.gateway.profile
@@ -628,6 +668,14 @@ class MyHOMEGatewayHandler(GatewayTopologyMixin, GatewayIdentityMixin):
         finally:
             self._end_sweep(epoch)
 
+    def _refused_by_gateway(self, frame: str) -> bool:
+        """Whether this gateway's firmware drops the startup request instead of forwarding it."""
+        if frame == "*#4*0##":
+            return self.general_zone_request_refused
+        if frame == "*#16*0*5##":
+            return self.sound_status_request_refused
+        return False
+
     def _discovery_frames(self) -> list[str]:
         """The startup general requests this gateway sends, after topology and profile gates."""
         frames: list[str] = []
@@ -645,6 +693,9 @@ class MyHOMEGatewayHandler(GatewayTopologyMixin, GatewayIdentityMixin):
                     who,
                     self.gateway.model_name,
                 )
+                continue
+            if self._refused_by_gateway(frame):
+                LOGGER.debug("%s Skipping `%s`: %s firmware refuses it.", self.log_id, frame, self.gateway.model_name)
                 continue
             frames.append(frame)
         return frames
