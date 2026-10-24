@@ -54,6 +54,7 @@ MyHOME climate entities support standard Home Assistant climate controls:
   - `auto`: Following scheduled setpoint or central program.
   - `off`: System frost-protection or thermal shutdown.
 * **Target Temperature**: Adjustable setpoint slider in 0.5 °C increments.
+  The slider shows the setpoint the thermostat regulates to (dimension 12, knob offset included) whenever the zone has reported it; the commanded setpoint (dimension 14) is only shown until then. On an F461 the two can differ (21.0 commanded, 23.5 in force after a knob change), and the attribute `local_target_temperature` carries the same value.
 * **Current Temperature**: Real-time ambient reading reported by the probe.
 * **Current Humidity**: Ambient relative humidity percentage for zones equipped with humidity sensors (e.g. Living Now thermostats or humidity probes).
 
