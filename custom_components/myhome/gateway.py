@@ -564,6 +564,26 @@ class MyHOMEGatewayHandler(GatewayTopologyMixin, GatewayIdentityMixin):
         return self._delegated_target(probe) or self._failover_target(probe) or self
 
     @property
+    def interface_zone_request_refused(self) -> bool:
+        """Whether WHO 4 requests behind an ``#4#II`` interface are dropped, misrouted, or crash the gateway.
+
+        Zero of the twelve emulated gateways in own-firmware-oracle (``findings/thermo-zone-requests.md``)
+        emit ``$06EC`` / ``$06E4`` interface-routed SCS frames for WHO 4: gateways either NACK/drop them,
+        truncate ``Z#4#II`` at ``#`` and cross-poll local zone ``Z`` on the main bus, or on MH202 ``010024``
+        misparse ``Z#4#01..09`` as local zone 4 actuator ``1..9`` and crash ``coso`` with ``SIGSEGV`` on
+        ``*#4*Z#4#01..09##`` (including before WHO 13 settles while the profile is still ``Generic``).
+        Delegates through ``_who4_target()``; an explicit bool ``supports_interface_zone_requests`` on the
+        OWNd profile overrides this default.
+        """
+        target = self._who4_target()
+        if target is not self:
+            return target.interface_zone_request_refused
+        supported = getattr(getattr(self.gateway, "profile", None), "supports_interface_zone_requests", None)
+        if isinstance(supported, bool):
+            return not supported
+        return True
+
+    @property
     def actuator_request_refused(self) -> bool:
         """Whether this gateway drops the zone actuator request (``*#4*Z*20##``).
 
@@ -631,6 +651,19 @@ class MyHOMEGatewayHandler(GatewayTopologyMixin, GatewayIdentityMixin):
             target = self._who4_target()
             for dimension in sorted({dim for _where, dim in pending}):
                 wheres = sorted(where for where, dim in pending if dim == dimension)
+                if target.interface_zone_request_refused:
+                    routed = [where for where in wheres if BUS_ROUTING in where]
+                    if routed:
+                        LOGGER.debug(
+                            "%s Zones %s: %s does not route WHO 4 dimension %s behind an interface; not asking",
+                            self.log_id,
+                            routed,
+                            target.model,
+                            dimension,
+                        )
+                        wheres = [where for where in wheres if BUS_ROUTING not in where]
+                        if not wheres:
+                            continue
                 if dimension == 20 and target.actuator_request_refused:
                     LOGGER.debug(
                         "%s Zones %s: %s refuses the actuator request; not asking", self.log_id, wheres, target.model
