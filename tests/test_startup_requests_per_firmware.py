@@ -160,7 +160,7 @@ def test_ssdp_model_string_hl4684_is_keyed_as_h4684(hass, ssdp_model):
     assert handler.supports_zone_status is False
     assert handler.general_zone_request_refused is True
     assert handler.sound_status_request_refused is False
-    assert handler.interface_zone_request_refused is False
+    assert handler.interface_zone_request_refused is True  # no gateway routes WHO 4 across #4#II by default (#816)
 
 
 @pytest.mark.parametrize("flag", [True, False])
@@ -236,9 +236,10 @@ async def test_interface_zone_is_not_polled_where_the_firmware_drops_the_request
         assert len(skipped()) == 1  # once per entity
 
 
-async def test_withheld_interface_poll_is_logged_even_when_humidity_keeps_the_update_going(hass, caplog):
-    """A humidity zone behind an F422 on an F459 (forwards *60##, drops Z#4#II requests) still sends its
-    *60## request; the withheld *0## is logged once."""
+async def test_withheld_interface_zone_sends_no_humidity_request_either(hass, caplog):
+    """A humidity zone behind an F422 on an F459: *#4*Z#4#II*60## is truncated to the local zone Z by the
+    firmware (own-firmware-oracle #65; live F461 2.0.11: answered by local zone 2's humidity), so every
+    WHO 4 request of the routed zone is withheld, and the one-shot DEBUG line is written once."""
     handler = _handler(hass, "F459")
     handler.send_status_request = AsyncMock()
     zone = _zone(hass, handler, interface="01", humidity=True)
@@ -246,19 +247,30 @@ async def test_withheld_interface_poll_is_logged_even_when_humidity_keeps_the_up
     with caplog.at_level("DEBUG", logger="custom_components.myhome"):
         await zone.async_update()
         await zone.async_update()
-    sent = [str(call.args[0]) for call in handler.send_status_request.await_args_list]
-    assert sent == ["*#4*3#4#01*60##", "*#4*3#4#01*60##"]
+    handler.send_status_request.assert_not_awaited()
     assert len([record for record in caplog.records if "drops `*#4*3#4#01*0##`" in record.message]) == 1
 
 
 @pytest.mark.parametrize("model", ["H4684", "MH200", "MH201"])
-async def test_interface_zone_is_polled_where_the_firmware_forwards_the_request(hass, model):
-    """H4684 and MH200 forward *#4*Z#4#II*0## (own-firmware-oracle PR #60); the MH201 is not in the oracle."""
+async def test_interface_zone_is_polled_only_where_the_profile_opts_in(hass, model):
+    """No gateway routes *#4*Z#4#II*0## across an F422 by default: H4684 and MH200 truncate it to the
+    local zone (own-firmware-oracle #65; live F461 2.0.11 the same), the MH201 is not in the oracle.
+    Only an OWNd profile stating ``supports_interface_zone_requests = True`` lets the poll out.
+    """
     handler = _handler(hass, model)
     handler.send_status_request = AsyncMock()
     zone = _zone(hass, handler, interface="01")
-    assert zone._poll_on_add is True
+    assert zone._poll_on_add is False
     await zone.async_update()
+    handler.send_status_request.assert_not_awaited()
+    handler.gateway.profile = SimpleNamespace(
+        model_name=handler.gateway.profile.model_name,
+        supports_interface_zone_requests=True,
+        supports_who=lambda who: True,
+    )
+    opted_in = _zone(hass, handler, interface="01")
+    assert opted_in._poll_on_add is True
+    await opted_in.async_update()
     assert [str(call.args[0]) for call in handler.send_status_request.await_args_list] == ["*#4*3#4#01*0##"]
 
 
@@ -287,8 +299,10 @@ async def test_f455_zone_still_sends_nothing(hass, caplog):
     assert zone._interface_poll_refused is False  # no temperature poll wanted, so nothing is "withheld"
     with caplog.at_level("DEBUG", logger="custom_components.myhome"):
         await zone.async_update()
+        await zone.async_update()
     handler.send_status_request.assert_not_awaited()
-    assert not [record for record in caplog.records if "firmware drops" in record.message]
+    # the routed zone is withheld on every gateway (#816): logged once, whatever the model
+    assert len([record for record in caplog.records if "firmware drops" in record.message]) == 1
 
 
 async def test_central_unit_is_not_a_temperature_poll(hass):

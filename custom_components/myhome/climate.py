@@ -444,6 +444,7 @@ class MyHOMEClimate(MyHOMEEntity, ClimateEntity):
             and getattr(self._gateway_handler, "interface_zone_request_refused", False) is True
         )
 
+    @property
     def _temperature_poll_wanted(self) -> bool:
         """Whether this zone's gateway needs each zone to ask for its temperature (``*#4*Z*0##``)."""
         gateway = getattr(self, "_gateway_handler", None)
@@ -619,14 +620,6 @@ class MyHOMEClimate(MyHOMEEntity, ClimateEntity):
             # 4-zone central units (#0#1) do not participate in point-to-point status polling;
             # bus captures confirm querying #0#1 times out on plants without a physical 4-zone unit (#629).
             # They receive setpoints via commands (*#4*#0#1*#14*T*M##), broadcast events, or restored state.
-            return
-        if not self._central and self._interface_request_refused:
-            LOGGER.debug(
-                "%s Zone %s: %s does not route WHO 4 requests behind an interface; skipping status poll",
-                self._gateway_handler.log_id,
-                self._full_where,
-                getattr(self._gateway_handler, "model", "gateway"),
-            )
             return
         # Humidity is asked only where the gateway forwards the request: the emulated firmware
         # of F450, F453, F453AV, F454, H4684, MH200, MH200N and MH202 did not (own-firmware-oracle
