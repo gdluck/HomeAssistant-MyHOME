@@ -47,7 +47,7 @@ from .data import MyHOMEConfigEntry, MyHOMERuntimeData
 from .expose import is_exposed_on_bus
 from .ignored import IgnoredAddresses
 from .myhome_device import MyHOMEEntity
-from .topology import peer_unique_id
+from .topology import entry_for_mac, peer_unique_id
 
 
 @dataclass(frozen=True)
@@ -241,27 +241,42 @@ def actuator_only_on_primary(registry: er.EntityRegistry, actuator_unique_id: st
 
 
 @callback
-def binary_sensor_only_on_primary(
-    hass: HomeAssistant, registry: er.EntityRegistry, device_identifier: str, own_mac: str, primary_mac: str
-) -> bool:
+def devices_with_binary_sensor(
+    hass: HomeAssistant, registry: er.EntityRegistry, config_entry_id: str, primary_mac: str
+) -> set[str]:
+    """MyHOME device identifiers that carry a binary sensor, on a follower and on its primary.
+
+    One pass over the entities of those two config entries, so a caller with many
+    ``myhome.yaml`` contacts scans once instead of walking the whole entity registry
+    for each of them.
+    """
+    entry_ids = [config_entry_id]
+    primary = entry_for_mac(hass, primary_mac, exclude=config_entry_id)
+    if primary is not None:
+        entry_ids.append(primary.entry_id)
+    devices = dr.async_get(hass)
+    with_sensor: set[str] = set()
+    for entry_id in entry_ids:
+        for entry in er.async_entries_for_config_entry(registry, entry_id):
+            if entry.domain != "binary_sensor" or not entry.device_id:
+                continue
+            device = devices.async_get(entry.device_id)
+            if device is not None:
+                with_sensor.update(identifier for domain, identifier in device.identifiers if domain == DOMAIN)
+    return with_sensor
+
+
+def binary_sensor_only_on_primary(with_sensor: set[str], device_identifier: str, own_mac: str, primary_mac: str) -> bool:
     """Whether a follower has no binary sensor on this device while its primary gateway does.
 
     That is the state ``PlatformDiscovery`` leaves behind for a follower's dry contact or
     auxiliary channel the primary already has (#453): its "Invert state" switch, which
-    shares the device, does not belong on the follower either.
+    shares the device, does not belong on the follower either. ``with_sensor`` comes from
+    ``devices_with_binary_sensor``; ``own_mac`` is the gateway's normalised MAC, the prefix
+    of every device identifier (an entry's stored ``CONF_MAC`` may differ in case).
     """
     peer = peer_unique_id(device_identifier, own_mac, primary_mac)
-    if peer is None:
-        return False
-    devices = dr.async_get(hass)
-    with_sensor: set[str] = set()
-    for entry in registry.entities.values():
-        if entry.domain != "binary_sensor" or entry.platform != DOMAIN or not entry.device_id:
-            continue
-        device = devices.async_get(entry.device_id)
-        if device is not None:
-            with_sensor.update(identifier for domain, identifier in device.identifiers if domain == DOMAIN)
-    return device_identifier not in with_sensor and peer in with_sensor
+    return peer is not None and device_identifier not in with_sensor and peer in with_sensor
 
 
 @callback
@@ -671,7 +686,8 @@ class PlatformDiscovery:
         primary_mac = getattr(self.runtime, "primary_gateway_mac", None)
         if not unique_id or not isinstance(primary_mac, str) or not primary_mac or not self._is_follower:
             return False
-        peer = peer_unique_id(unique_id, self.mac, primary_mac)
+        # Unique ids start with the gateway's normalised MAC; the entry's stored MAC may differ in case
+        peer = peer_unique_id(unique_id, str(self.runtime.mac), primary_mac)
         return peer is not None and isinstance(registry.async_get_entity_id(self.platform, DOMAIN, peer), str)
 
     def _discovers(self) -> bool:

@@ -39,6 +39,7 @@ from custom_components.myhome.const import (
 from custom_components.myhome.discovery import (
     PlatformDiscovery,
     binary_sensor_only_on_primary,
+    devices_with_binary_sensor,
     prune_orphaned_companions,
 )
 from custom_components.myhome.topology import (
@@ -444,8 +445,10 @@ def _contact(hass: HomeAssistant, entry, mac: str, where: str, *, sensor: bool =
 
 
 @pytest.mark.parametrize("follower", [True, False])
+@pytest.mark.parametrize("conf_mac", [NEW, NEW.upper()])
+@pytest.mark.parametrize("setup_order", [("binary_sensor", "switch"), ("switch", "binary_sensor")])
 async def test_switch_setup_does_not_recreate_the_invert_switch_of_a_pruned_duplicate(
-    hass: HomeAssistant, follower: bool
+    hass: HomeAssistant, follower: bool, conf_mac: str, setup_order: tuple[str, str]
 ) -> None:
     """A follower's myhome.yaml contact that lives on the primary gets no "Invert state" switch.
 
@@ -454,6 +457,11 @@ async def test_switch_setup_does_not_recreate_the_invert_switch_of_a_pruned_dupl
     with nothing else (live F455 standby next to an F461 on 2.0.0b18, 2026-11-14: the WHO 25
     contact 344 kept ``{mac}-25-344-invert`` on the F455 while ``{mac}-25-344-motion`` lives
     on the F461).
+
+    ``conf_mac``: a legacy entry may keep an uppercase ``CONF_MAC`` (the migration normalises
+    the entry's unique id only), while unique ids and device identifiers always start with
+    the gateway's normalised MAC. ``setup_order``: ``PLATFORMS`` sets the switch platform up
+    before the binary sensor platform.
     """
     registry, devices = er.async_get(hass), dr.async_get(hass)
     if follower:
@@ -461,6 +469,8 @@ async def test_switch_setup_does_not_recreate_the_invert_switch_of_a_pruned_dupl
     else:
         entry_p, _ = _create_mock_gateway(hass, PRI)
         entry_x, _ = _create_mock_gateway(hass, NEW)
+    hass.config_entries.async_update_entry(entry_x, data={**entry_x.data, CONF_MAC: conf_mac})
+    assert entry_x.data[CONF_MAC] == conf_mac and entry_x.runtime_data.mac == NEW
     _contact(hass, entry_p, PRI, "344")
     _contact(hass, entry_x, NEW, "344", sensor=False)  # what the pruned duplicate left behind
     _contact(hass, entry_x, NEW, "77")  # the primary lacks it
@@ -477,7 +487,7 @@ async def test_switch_setup_does_not_recreate_the_invert_switch_of_a_pruned_dupl
             hass=hass, logger=logging.getLogger(__name__), domain=domain, platform_name=DOMAIN,
             platform=module, scan_interval=timedelta(seconds=30), entity_namespace=None,
         )
-        for domain, module in (("binary_sensor", binary_sensor), ("switch", switch))
+        for domain, module in ((name, {"binary_sensor": binary_sensor, "switch": switch}[name]) for name in setup_order)
     ]
     try:
         for platform in platforms:
@@ -511,15 +521,40 @@ async def test_binary_sensor_only_on_primary(hass: HomeAssistant) -> None:
     _contact(hass, entry_x, NEW, "344", sensor=False)
     _contact(hass, entry_x, NEW, "77")
     _contact(hass, entry_x, NEW, "55")
+    with_sensor = devices_with_binary_sensor(hass, registry, entry_x.entry_id, PRI)
 
-    def only_on_primary(identifier: str) -> bool:
-        return binary_sensor_only_on_primary(hass, registry, identifier, NEW, PRI)
+    def only_on_primary(identifier: str, own_mac: str = NEW) -> bool:
+        return binary_sensor_only_on_primary(with_sensor, identifier, own_mac, PRI)
 
     assert only_on_primary(f"{NEW}-25-344") is True
     assert only_on_primary(f"{NEW}-25-77") is False  # both gateways have the sensor
     assert only_on_primary(f"{NEW}-25-55") is False  # the primary lacks it
     assert only_on_primary(f"{NEW}-25-99") is False  # nobody has it
     assert only_on_primary("11:22:33:44:55:66-25-344") is False  # not this gateway's device
+    # identifiers start with the normalised MAC: an entry's uppercase CONF_MAC does not match them
+    assert only_on_primary(f"{NEW}-25-344", NEW.upper()) is False
+
+
+async def test_devices_with_binary_sensor_reads_the_follower_and_its_primary_only(hass: HomeAssistant) -> None:
+    registry, devices = er.async_get(hass), dr.async_get(hass)
+    entry_p, entry_x = _follower(hass)
+    entry_other, _ = _create_mock_gateway(hass, SB)
+    _contact(hass, entry_p, PRI, "344")
+    _contact(hass, entry_x, NEW, "344", sensor=False)
+    _contact(hass, entry_x, NEW, "77")
+    _contact(hass, entry_other, SB, "12")  # a third gateway is not read
+    registry.async_get_or_create("binary_sensor", DOMAIN, f"{NEW}-25-1-motion", config_entry=entry_x)  # no device
+    # a contact of another integration that happens to sit on a MyHOME-looking device
+    foreign = MockConfigEntry(domain="other")
+    foreign.add_to_hass(hass)
+    foreign_device = devices.async_get_or_create(
+        config_entry_id=foreign.entry_id, identifiers={(DOMAIN, f"{PRI}-25-3")}
+    )
+    registry.async_get_or_create("binary_sensor", "other", "x", config_entry=foreign, device_id=foreign_device.id)
+
+    assert devices_with_binary_sensor(hass, registry, entry_x.entry_id, PRI) == {f"{PRI}-25-344", f"{NEW}-25-77"}
+    # the primary's entry is gone: only the follower's own contacts
+    assert devices_with_binary_sensor(hass, registry, entry_x.entry_id, "00:03:50:aa:bb:99") == {f"{NEW}-25-77"}
 
 
 async def test_calibrate_all_button_reactive_availability_and_no_covers(

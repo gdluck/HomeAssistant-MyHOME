@@ -73,6 +73,7 @@ from .discovery import (
     PlatformDiscovery,
     binary_sensor_only_on_primary,
     default_known_keys,
+    devices_with_binary_sensor,
     parse_unique_id,
     prune_entity,
 )
@@ -433,14 +434,23 @@ async def async_setup_entry(
         if inv is not None:
             invert_entities.append(inv)
 
+    # Shared bus (#453): the contacts with a binary sensor on this follower and on its
+    # primary, read once for all the myhome.yaml contacts below.
+    follower_contacts: tuple[str, set[str]] | None = None
+    if registry is not None and runtime.is_follower and runtime.primary_gateway_mac:
+        follower_contacts = (
+            runtime.primary_gateway_mac,
+            devices_with_binary_sensor(hass, registry, config_entry.entry_id, runtime.primary_gateway_mac),
+        )
+
     def _contact_only_on_primary(switch: MyHOMEInvertSwitch) -> bool:
         """Shared bus: this follower's contact lives on its primary gateway (#453)."""
-        primary_mac = runtime.primary_gateway_mac
-        if registry is None or not runtime.is_follower or not primary_mac:
+        if follower_contacts is None:
             return False
+        primary_mac, with_sensor = follower_contacts
         identifiers = (switch.device_info or {}).get("identifiers") or set()
         return any(
-            domain == DOMAIN and binary_sensor_only_on_primary(hass, registry, identifier, entry_mac, primary_mac)
+            domain == DOMAIN and binary_sensor_only_on_primary(with_sensor, identifier, gateway_mac, primary_mac)
             for domain, identifier in identifiers
         )
 
