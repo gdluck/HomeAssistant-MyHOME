@@ -185,7 +185,7 @@ def test_hl4684_ssdp_profile_identity_and_fw6_who22(hass: HomeAssistant) -> None
     assert handler.profile_supports_who(25) is False
     assert gateway_supported_whos("H/L4684", "6.0.11") == {1, 2, 4, 15, 16, 18, 22}
     assert gateway_supported_whos("H/L4684", "2.0.54") == {1, 2, 4, 15, 16, 18}
-    # The pinned OWNd (2.0.0b13, OWNd#147) aliases the SSDP spellings itself: no MyHOME shim.
+    # The pinned OWNd (OWNd#147, since 2.0.0b13) aliases the SSDP spellings itself: no MyHOME shim.
     for spelling in ("H/L4684", "HL4684", "HC4684"):
         assert _profile_for_model(spelling, "6.0.11").model_name == "H4684"
         assert _profile_for_model(spelling, "6.0.11").supports_who(22) is True

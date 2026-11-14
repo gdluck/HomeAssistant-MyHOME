@@ -154,7 +154,7 @@ def _profile_for_model(
     """Resolve ``model`` to an OWNd profile (firmware-aware, e.g. the H4684's WHO 22 from 6.0.0).
 
     SSDP spellings such as ``H/L4684`` / ``HL4684`` / ``HC4684`` are aliased by the pinned OWNd
-    itself (OWNd#147, in OWNd 2.0.0b13). Touch screen family spellings (067292, etc.) are mapped
+    itself (OWNd#147, since OWNd 2.0.0b13). Touch screen family spellings (067292, etc.) are mapped
     via ``_MODEL_SPELLINGS`` (#832).
     """
     profile = _call_get_gateway_profile(model, firmware, lookup=lookup)

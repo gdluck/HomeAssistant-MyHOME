@@ -567,7 +567,7 @@ def test_calibrate_discovery_use_pinned_overrides_installed_ownd(monkeypatch: py
 def test_oracle_check_enforces_who16_pin_now_that_manifest_pins_ownd_2_0_0b13(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    """manifest.json pins OWNd==2.0.0b13 (past OWNd#142): the F461 / MyHomeServer1 rows pin WHO 22 only.
+    """manifest.json pins an OWNd past OWNd#142 (2.0.0b13 and later): the F461 / MyHomeServer1 rows pin WHO 22 only.
 
     The WHO 16 transition window closed with the pin bump: a row that disagrees with the
     installed profile is flagged whichever side of #142 the installed OWNd is on, and the

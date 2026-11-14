@@ -356,7 +356,7 @@ def test_sync_gateway_discovery_detects_drift_and_updates(tmp_path, monkeypatch)
 
 
 def test_check_all_documentation_follows_ownd_142_rows_at_the_pin_bump(tmp_path, monkeypatch):
-    """manifest.json pins OWNd==2.0.0b13 (past OWNd #142): the committed docs carry the WHO 22-only rows.
+    """manifest.json pins an OWNd past OWNd #142 (2.0.0b13 and later): the committed docs carry the WHO 22-only rows.
 
     check_all_documentation is green against the pinned profiles (no WHO 16 on the F461 /
     MyHomeServer1), and a stale pre-#142 OWNd install is flagged by both the oracle and the
@@ -398,7 +398,7 @@ def test_check_all_documentation_follows_ownd_142_rows_at_the_pin_bump(tmp_path,
     if "update_gateway_profiles" in sys.modules:
         monkeypatch.setattr(sys.modules["update_gateway_profiles"], "_patched_ownd_profiles", lambda: [])
 
-    # 1. With manifest.json at OWNd==2.0.0b13 and the pinned (OWNd #142) profiles, the full
+    # 1. With manifest.json past OWNd #142 (2.0.0b13 and later) and the pinned profiles, the full
     #    real-tree doc check passes cleanly.
     ok, messages = syncdoc.check_all_documentation(update=False)
     assert ok is True, f"Expected zero drift against the pinned OWNd profiles: {messages}"
