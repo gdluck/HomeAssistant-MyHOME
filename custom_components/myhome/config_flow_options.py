@@ -186,6 +186,8 @@ class MyhomeOptionsFlowHandler(
         # ── Build form schema ─────────────────────────────────────────────
         model_options = [m for m in SUPPORTED_GATEWAY_MODELS]
         current_model = self.data.get(CONF_NAME, "MyHomeServer1")
+        if errors and user_input and user_input.get(CONF_NAME):
+            current_model = user_input[CONF_NAME]
         if current_model not in model_options:
             model_options.insert(0, current_model)
         # An entry that never finished setup since upgrading still stores a count

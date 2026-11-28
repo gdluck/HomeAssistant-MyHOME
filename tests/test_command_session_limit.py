@@ -182,3 +182,39 @@ def test_corrected_model_keeps_workers_within_limit(model, workers) -> None:
     assert handler.sending_workers == before
     for worker in before:
         worker.cancel.assert_not_called()
+
+
+async def test_options_form_keeps_the_chosen_model_after_a_rejected_submit(
+    hass: HomeAssistant,
+) -> None:
+    """When switching F454 -> MH200N is rejected for worker count, the re-shown form keeps MH200N and caps suggested workers."""
+    entry = _entry("F454", 3)
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == FlowResultType.FORM
+
+    rejected = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            "command_worker_count": 3,
+            "generate_events": False,
+            "address": "192.0.2.40",
+            "password": "12345",
+            "name": "MH200N",
+        },
+    )
+    assert rejected["type"] == FlowResultType.FORM
+    assert rejected["errors"] == {"command_worker_count": "worker_count_above_gateway_limit"}
+    assert rejected["description_placeholders"] == {
+        "session_limit": "1",
+        "session_default": "1",
+        "model": "MH200N",
+    }
+    name_field = next(k for k in rejected["data_schema"].schema if k == "name")
+    assert name_field.default() == "MH200N"
+    workers_field = next(
+        k for k in rejected["data_schema"].schema if k == "command_worker_count"
+    )
+    assert workers_field.description["suggested_value"] == 1
+
