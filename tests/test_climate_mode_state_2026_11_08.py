@@ -558,6 +558,15 @@ def test_myhomeserver1_schedule_auto_survives_the_trailing_season_frame() -> Non
     assert zone1.hvac_mode == HVACMode.COOL
 
 
+@pytest.mark.parametrize("dim7_frame", ["*#4*1*7*3*3##", "*#4*1*7*3*4##"])
+def test_schedule_auto_in_comfort_or_eco_survives_the_trailing_season_frame(dim7_frame: str) -> None:
+    # Dimension 7 context 3 (automatic) with state 3 (comfort) or 4 (eco): the zone itself
+    # reports AUTO, so its trailing season frame keeps AUTO (PR #880 review rule).
+    zone1 = _climate(_gateway(has_central_unit=False), "1", standalone=None)
+    _replay(zone1, [dim7_frame, "*4*1*1##"])
+    assert zone1.hvac_mode == HVACMode.AUTO
+
+
 async def test_restored_auto_then_schedule_auto_is_kept() -> None:
     from homeassistant.core import State
 

@@ -1,17 +1,16 @@
-"""#466: 3488 HOMETOUCH with MyHomeServer1 (FW 3.2.5) connected — full Home Assistant debug log.
+"""#466: BTicino 3488 HOMETOUCH (FW 3.2.5, initially configured as MyHomeServer1) — full Home Assistant debug log.
 
-Contributed by the reporter of the 2026-11-04 MyHomeServer1 sweep (#466), as the complete,
+Contributed by the reporter of the 2026-11-04 sweep (#466), as the complete,
 untruncated ``home-assistant_myhome`` log of the whole session (exported 10:30:17Z); the Bus Monitor
 export of that morning (``myhome_sweep_MyHomeServer1_all_2026-11-04T09-35-58.json``) is a 200-frame
 buffer window that does not overlap this log's DEBUG traffic, so both are kept.
 
-The gateway is a MyHomeServer1: the integration auto-detects firmware ``3.2.5`` via WHO 13 dimension
-16, WHO 13 reports device type ``200`` and the ``1013-1-128`` model code, and the MAC carries the
-BTicino OUI. The plant is a 3488 HOMETOUCH touch screen connected to that MyHomeServer1: the 3488 is
-not a web server and cannot be the OpenWebNet endpoint, so OWNd connects over IP, port and password
-to the MyHomeServer1 and every frame below is received from it. Mid-session (11:44:36 local) the
-reporter re-configured the entry from the ``MyHomeServer1`` profile to ``Generic``, so every one of
-the 1374 inbound frames in the log is received under the Generic profile on MyHomeServer1 hardware.
+The OpenWebNet endpoint is a BTicino 3488 HOMETOUCH running SMARTDES firmware ``3.2.5``: the
+integration auto-detects firmware ``3.2.5`` via WHO 13 dimension 16, WHO 13 reports device type
+``200`` and WHO 1013 reports ``1013-1-128`` (BTicino ``3488``), and the MAC carries the BTicino OUI.
+Mid-session (11:44:36 local) the reporter re-configured the entry from the ``MyHomeServer1`` profile
+to ``Generic``, so every one of the 1374 inbound frames in the log is received under the Generic
+profile on ``3488`` hardware.
 
 Late in the session (12:27-12:30 local) the reporter used the 3488's video door-entry functions,
 which puts WHO 7 (video) and WHO 8 (door entry) traffic on the event session. The WHO 7 event-form

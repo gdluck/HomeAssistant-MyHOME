@@ -534,17 +534,21 @@ WHO1013_OBJECT_MODELS: dict[str, tuple[str, ...]] = {
     "105": ("F458", "003599"),
     "134": ("F461",),
 }
-# WHO=1013 dimension 1 OBJECT_MODEL values observed on physical hardware outside
-# MHCatalogue.db's Integration Functions table (id_system = 26).
+# WHO=1013 dimension 1 OBJECT_MODEL values confirmed on physical hardware that are kept
+# out of ``WHO1013_OBJECT_MODELS`` (either absent from MHCatalogue.db's Integration
+# Functions table, or kept non-overriding so manual ``MyHomeServer1`` entries stay intact).
 #    16: Confirmed on physical BTicino F453 firmware 2.0.10 (Discussion #856
 #        comment 19587072, kernel 2.3.8, ETLinux 3.0.1): on `myhome.sweep_bus`,
 #        `*#1013*0*1##` answered `*#1013**1*16*0*1*0##`, echoing its WHO=13
 #        device type `16` with N_CONF `0`, BRAND `1` (BTicino), LINE `0`
 #        rather than MHCatalogue.db's `42`.
-#   128: Confirmed on physical BTicino 3488 firmware 3.2.5 (live bus 2 capture,
-#        2026-11-27): `*#13**15##` answered `*#13**15*200##`, `*#13**27##`
-#        answered `*#13**27*51#52#56#56##` (ASCII "3488"), and `*#1013**1##`
+#   128: Present in MHCatalogue.db Integration Functions (`AS_ITEM_SYSTEM`, `OWN-DEV-0156`,
+#        HOME TOUCH 7 `3488` / `067259`) and confirmed on physical BTicino 3488 firmware
+#        3.2.5 (live bus 2 capture, 2026-11-27): `*#13**15##` answered `*#13**15*200##`,
+#        `*#13**27##` answered `*#13**27*51#52#56#56##` (ASCII "3488"), and `*#1013**1##`
 #        answered `*#1013**1*128*15*1*0##` (N_CONF 15, BRAND 1 = BTicino, LINE 0).
+#        Kept here rather than ``WHO1013_OBJECT_MODELS`` so an explicit manual
+#        ``MyHomeServer1`` config entry is not silently overwritten.
 WHO1013_OBSERVED_OBJECT_MODELS: dict[str, tuple[str, ...]] = {
     "16": ("F453",),
     "128": ("3488", "067259"),

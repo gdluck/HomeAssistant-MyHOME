@@ -591,6 +591,10 @@ class MyHOMEClimate(MyHOMEEntity, ClimateEntity):
         # HVACMode.AUTO before any season was known, so a trailing *4*1*Z## / *4*0*Z## replaces
         # it without cancelling a real DIM 7 ``automatic`` mode (e.g. *#4*Z*7*3*0##).
         self._seasonless_auto = False
+        # True while zone_operation is a comfort / eco state the zone reported in Dimension 7
+        # context 3 (automatic), e.g. *#4*Z*7*3*3##: that is the zone's own AUTO, so its trailing
+        # season frame keeps AUTO (PR #880 review rule), unlike a 107/108/207/208 preset.
+        self._dim7_automatic_preset = False
         # Central unit: Home Assistant's last command and when its local echo stops being expected,
         # and the echo frame once seen (the same frame object can be delivered more than once).
         self._central_echo: tuple[str, float | None, float] | None = None
@@ -4005,6 +4009,9 @@ class MyHOMEClimate(MyHOMEEntity, ClimateEntity):
                 self._zone_operation = state
             else:
                 self._zone_operation = None
+            self._dim7_automatic_preset = (
+                state in ("comfort", "eco") and zone_context == "automatic"
+            )
         if state in _ZONE_STATES_OFF:
             self._restore_nominal_before_protection()
             self._attr_hvac_mode = HVACMode.OFF
@@ -4841,7 +4848,10 @@ class MyHOMEClimate(MyHOMEEntity, ClimateEntity):
             standalone_mode = self._standalone and (
                 not (self._attr_hvac_mode == HVACMode.AUTO and not self._hvac_mode_restored)
                 or self._seasonless_auto
-                or self._zone_operation in (*_ZONE_PROTECTION_OPERATIONS, "comfort", "eco")
+                or (
+                    self._zone_operation in (*_ZONE_PROTECTION_OPERATIONS, "comfort", "eco")
+                    and not self._dim7_automatic_preset
+                )
             )
             previous_season = self._season
             self._season = message.season
@@ -4854,7 +4864,10 @@ class MyHOMEClimate(MyHOMEEntity, ClimateEntity):
             self._note_own_season(message)
             self._refresh_hvac_modes()
             if (
-                self._zone_operation in (*_ZONE_PROTECTION_OPERATIONS, "comfort", "eco")
+                (
+                    self._zone_operation in (*_ZONE_PROTECTION_OPERATIONS, "comfort", "eco")
+                    and not self._dim7_automatic_preset
+                )
                 or (
                     self._standalone
                     and self._zone_operation == "manual"
@@ -4995,6 +5008,7 @@ class MyHOMEClimate(MyHOMEEntity, ClimateEntity):
             elif raw_what not in ("0", "1"):
                 # Off (103 / 203 / 303) and anything not in the table clear it.
                 self._zone_operation = _ZONE_OPERATION.get(raw_what)
+                self._dim7_automatic_preset = False
             if protection is not None:
                 # *4*102*#0## / *4*202*#0## is the central unit in antifreeze / thermal
                 # protection (WHO 4 p. 5, p. 64): the plant keeps its season and holds the
@@ -5147,6 +5161,7 @@ class MyHOMEClimate(MyHOMEEntity, ClimateEntity):
                 # in the table clears it.
                 raw_what = str(message).split("*")[2] if str(message).startswith("*4*") else ""
                 self._zone_operation = _ZONE_OPERATION.get(raw_what.split("#", 1)[0])
+                self._dim7_automatic_preset = False
             if message.mode == CLIMATE_MODE_AUTO and HVACMode.AUTO in self._attr_hvac_modes:
                 LOGGER.debug(
                     "%s %s",

@@ -509,6 +509,9 @@ async def test_audit_bug7_gateway_events_rejects_malformed_where_and_zone_00(
     handler.request_zone_dimension = MagicMock()
     handler.owned_whos = None
     dispatcher = GatewayEventDispatcher(handler)
+    # A MagicMock handler has a truthy ``is_standby``: without forcing the WHO 4 branch
+    # active, the dispatcher skips the WHO 4 block and the assertions below pass vacuously.
+    dispatcher._is_active_for_who = lambda who: True  # type: ignore[method-assign]
 
     for bad_frame in (
         "*#4*001*#14*0215*3##",
@@ -520,6 +523,10 @@ async def test_audit_bug7_gateway_events_rejects_malformed_where_and_zone_00(
         await dispatcher.process_message(OWNMessage.parse(bad_frame))
     handler.request_zone_dimension.assert_not_called()
     handler.send_status_request.assert_not_called()
+
+    # Positive control: a valid plain-zone #14 echo DOES reach request_zone_dimension.
+    await dispatcher.process_message(OWNMessage.parse("*#4*2*#14*0215*3##"))
+    handler.request_zone_dimension.assert_called_once_with("2", 14)
 
 
 def test_live_bus2_3488_who1013_model_128_resolved() -> None:

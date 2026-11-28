@@ -1,8 +1,10 @@
-# 3488 HOMETOUCH with MyHomeServer1 (3.2.5) connected — full Home Assistant debug log, 2026-11-04 (#466)
+# BTicino 3488 HOMETOUCH (fw 3.2.5, initially configured as MyHomeServer1) — full Home Assistant debug log, 2026-11-04 (#466)
 
-The plant: a BTicino **3488 HOMETOUCH** touch screen connected to a **MyHomeServer1** gateway. The
-3488 is not a web server and cannot be the OpenWebNet endpoint; OWNd connects over IP, port and
-password to the MyHomeServer1, which is the gateway every frame below is received from.
+The endpoint answering OpenWebNet on port 20000 is a BTicino **3488 HOMETOUCH** 7" touch screen
+running SMARTDES firmware `3.2.5` (initially configured under the `MyHomeServer1` profile and later
+switched to `Generic`). Live Bus 2 verification and the `3488/030205` firmware oracle confirm that
+the `3488` ships its own `openserver` on TCP port 20000 (`IsGateway=1`, `ForceHMAC=1`) and replies
+with WHO 13 device type `200`, firmware `3.2.5`, and WHO 1013 `OBJECT_MODEL = 128`.
 
 `MyHomeServer1_full_debug_log_2026-11-04T10-30-17.txt`: the reporter's complete
 `home-assistant_myhome` log (4935 lines, 11:27:00 → 12:30:11 local, exported 10:30:17Z), verbatim
@@ -14,10 +16,9 @@ nothing else was changed. No password is echoed in the log.
 What it carries:
 
 - **Identification** (INFO lines, 11:29:18): `Auto-detected gateway firmware 3.2.5 via WHO=13 Dimension
-  16`, WHO 13 device type `200`, model code `1013-1-128`. The gateway is the MyHomeServer1; the 3488
-  HOMETOUCH connected to it is a touch screen on the SCS bus and never the connection endpoint.
+  16`, WHO 13 device type `200`, model code `1013-1-128` (BTicino `3488` HOMETOUCH).
 - **Profile switch** (11:44:36): the entry is re-configured from the `MyHomeServer1` profile to
-  `Generic`; all DEBUG bus traffic that follows runs under the Generic profile on MyHomeServer1 hardware.
+  `Generic`; all DEBUG bus traffic that follows runs under the Generic profile on `3488` hardware.
 - **1374 inbound frames** (11:47:38 → 12:30:11): 950 WHO 4 thermoregulation (zone actuator state,
   setpoints, manual mode `4002`), 349 WHO 1 lighting with four-digit WHERE, 44 WHO 7 video and 29 WHO 8
   door-entry frames from the 3488's video door-entry functions (12:27–12:30), and two undocumented

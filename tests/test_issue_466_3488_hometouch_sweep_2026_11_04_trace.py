@@ -1,12 +1,11 @@
-"""#466: 3488 HOMETOUCH with MyHomeServer1 (FW 3.2.5) connected — thermoregulation sweep.
+"""#466: BTicino 3488 HOMETOUCH (FW 3.2.5, configured as MyHomeServer1) — thermoregulation sweep.
 
 Contributed by @gimprota76 in:
 - https://github.com/OpenWebNet-HA/MyHOME/issues/466#issuecomment-6626706525
 
-The gateway is a MyHomeServer1 on firmware 3.2.5 (``identification.source == "manual"``,
-``configured_model == "MyHomeServer1"``, WHO 13 code ``200``, ``MyHomeServer1Profile``). The plant is a
-3488 HOMETOUCH touch screen connected to that MyHomeServer1: the 3488 is not a web server and cannot be
-the OpenWebNet endpoint, so OWNd connects over IP, port and password to the MyHomeServer1.
+The endpoint is a BTicino 3488 HOMETOUCH running SMARTDES firmware 3.2.5 (WHO 13 code ``200``,
+WHO 1013 ``OBJECT_MODEL = 128``), manually configured as ``MyHomeServer1`` at capture time
+(``identification.source == "manual"``, ``configured_model == "MyHomeServer1"``, ``MyHomeServer1Profile``).
 Home Assistant 2026.10.4, MyHOME 2.0.0b17, OWNd 2.0.0b13.
 
 A 200-frame window of the gateway's bus buffer (``truncated: true``) that is entirely WHO 4

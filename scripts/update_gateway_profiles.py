@@ -87,7 +87,7 @@ GATEWAY_METADATA: list[dict[str, object]] = [
         "ssdp_models": [],
         "profile_name": "3488",
         "protocol": "OpenWebNet / HMAC",
-        "max_workers": "1 worker",
+        "max_workers": "2 workers",
         "delay": "50 ms",
         "upnp": "❌ Manual",
         "notes": '7" HOMETOUCH colour touch screen (SMARTDES, local OpenWebNet server on port 20000)',
