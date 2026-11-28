@@ -922,3 +922,112 @@ async def test_gateway_events_normalizes_leading_zero_and_bounds_f422_interface(
     handler.request_zone_dimension.assert_not_called()
 
 
+@pytest.mark.asyncio
+async def test_standalone_detected_clears_f455_automatic_zone_operation(
+    hass: HomeAssistant,
+) -> None:
+    """F455's made-up *4*311*#Z## before standalone detection never leaves zone_operation='automatic'."""
+    from homeassistant.core import State
+
+    z = _make_zone(hass, "2", standalone=None)
+    z._gateway_handler.has_central_unit = True
+    z._gateway_handler.central_season = "conditioning"
+    z._handle_event(OWNMessage.parse("*4*1*2##"))
+    z._handle_event(OWNMessage.parse("*4*311*#2##"))
+    assert z._zone_operation == "automatic"
+    z._mark_standalone_detected(by_season=True)
+    assert z._standalone_detected is True
+    assert z._zone_operation is None
+    assert z.hvac_mode == HVACMode.HEAT
+
+    # Upgrade/restore of a previously polluted F455 standalone state also clears 'automatic'
+    z_restored = _make_zone(hass, "2", standalone=None)
+    await z_restored.async_restore_last_state(
+        State(
+            "climate.zone_2",
+            "heat",
+            {"standalone_detected": True, "zone_operation": "automatic", "season": "heating"},
+        )
+    )
+    assert z_restored._standalone_detected is True
+    assert z_restored._zone_operation is None
+
+
+@pytest.mark.asyncio
+async def test_zone_poll_skips_dim11_when_status_reply_reveals_valve_season(
+    hass: HomeAssistant,
+) -> None:
+    """Re-check _season_has_fan_coil() after *#4*Z## so heating-valve zones skip NACKed *#4*Z*11##."""
+    # Zone 57 on Bus 2: cooling fan coil (5), heating valve (0); season initially unknown.
+    z_heat = _make_zone(hass, "57", standalone=True)
+    z_heat._gateway_handler.request_zone_dimension = MagicMock(return_value=True)
+    z_heat._enable_fan_mode()
+    z_heat._handle_event(OWNMessage.parse("*#4*57*19*5*0##"))
+    assert z_heat._fan_coil_sides == {"cooling": True, "heating": False}
+    assert z_heat._season is None
+    # Before *#4*57## runs, DIM 19 on a mixed valve/fan-coil zone must NOT fire a premature DIM 11.
+    z_heat._gateway_handler.request_zone_dimension.assert_not_called()
+    sent_heat: list[str] = []
+
+    async def _fake_send_heat(cmd: object, **kwargs: object) -> None:
+        raw = str(cmd)
+        sent_heat.append(raw)
+        if raw == "*#4*57##":
+            z_heat._handle_event(OWNMessage.parse("*4*1*57##"))
+
+    z_heat._send_zone_poll_frame = _fake_send_heat  # type: ignore[method-assign]
+    await z_heat._async_send_zone_polls(skip_reported=True, pace=True)
+    assert sent_heat == ["*#4*57##"]
+
+    # When *#4*57## reports cooling season (*4*0*57##), DIM 11 IS still polled.
+    z_cool = _make_zone(hass, "57", standalone=True)
+    z_cool._gateway_handler.request_zone_dimension = MagicMock(return_value=True)
+    z_cool._enable_fan_mode()
+    z_cool._handle_event(OWNMessage.parse("*#4*57*19*5*0##"))
+    z_cool._gateway_handler.request_zone_dimension.assert_not_called()
+    sent_cool: list[str] = []
+
+    async def _fake_send_cool(cmd: object, **kwargs: object) -> None:
+        raw = str(cmd)
+        sent_cool.append(raw)
+        if raw == "*#4*57##":
+            z_cool._handle_event(OWNMessage.parse("*4*0*57##"))
+
+    z_cool._send_zone_poll_frame = _fake_send_cool  # type: ignore[method-assign]
+    await z_cool._async_send_zone_polls(skip_reported=True, pace=True)
+    assert sent_cool == ["*#4*57##", "*#4*57*11##"]
+
+    # Both-sides fan coil (*#4*2*19*5*8##) still asks DIM 11 immediately even before *#4*2##.
+    z_both = _make_zone(hass, "2", standalone=True)
+    z_both._gateway_handler.request_zone_dimension = MagicMock(return_value=True)
+    z_both._enable_fan_mode()
+    z_both._handle_event(OWNMessage.parse("*#4*2*19*5*8##"))
+    z_both._gateway_handler.request_zone_dimension.assert_called_once_with("2", 11)
+
+    # Autonomous DIM 7 (*#4*60*7*1*1*0230##) + DIM 0 records heating season so mixed zone skips DIM 11.
+    z_dim7 = _make_zone(hass, "60", standalone=True)
+    z_dim7._gateway_handler.request_zone_dimension = MagicMock(return_value=True)
+    z_dim7._enable_fan_mode()
+    z_dim7._handle_event(OWNMessage.parse("*#4*60*19*5*0##"))
+    z_dim7._handle_event(OWNMessage.parse("*#4*60*7*1*1*0230##"))
+    z_dim7._handle_event(OWNMessage.parse("*#4*60*0*0230##"))
+    assert z_dim7._season == "heating"
+    assert z_dim7._season_reported is True
+    sent_dim7: list[str] = []
+
+    async def _fake_send_dim7(cmd: object, **kwargs: object) -> None:
+        sent_dim7.append(str(cmd))
+
+    z_dim7._send_zone_poll_frame = _fake_send_dim7  # type: ignore[method-assign]
+    await z_dim7._async_send_zone_polls(skip_reported=True, pace=True)
+    assert sent_dim7 == ["*#4*60*13##"]
+
+    # Cooling DIM 7 (*#4*60*7*2*1*0250##) records conditioning season so cooling fan-coil zone polls DIM 11.
+    sent_dim7.clear()
+    z_dim7._handle_event(OWNMessage.parse("*#4*60*7*2*1*0250##"))
+    assert z_dim7._season == "conditioning"
+    await z_dim7._async_send_zone_polls(skip_reported=True, pace=True)
+    assert sent_dim7 == ["*#4*60*11##"]
+
+
+

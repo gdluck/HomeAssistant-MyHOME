@@ -1498,7 +1498,7 @@ class MyHOMEClimate(MyHOMEEntity, ClimateEntity):
                 OWNHeatingCommand.get_temperature(master_where),
                 pace=pace,
             )
-        if ask_fan:
+        if ask_fan and self._season_has_fan_coil():
             await self._send_zone_poll_frame(
                 cast(OWNCommand, OWNHeatingCommand.parse(f"*#4*{self._request_where}*11##")),
                 pace=pace,
@@ -3117,6 +3117,10 @@ class MyHOMEClimate(MyHOMEEntity, ClimateEntity):
         goes to 0 % when the central unit switches its zones off; not for a zone it does not run.
         """
         self._standalone_detected = detected
+        if detected and self._zone_operation == "automatic":
+            # Clear central-program operation left by an F455's made-up ``*4*311*#Z##``
+            # before standalone detection settled.
+            self._zone_operation = None
         shared = getattr(self._gateway_handler, "standalone_detected_zones", None)
         zone = canonical_thermo_zone(self._where)
         if isinstance(shared, set) and zone is not None:
@@ -3978,7 +3982,14 @@ class MyHOMEClimate(MyHOMEEntity, ClimateEntity):
         WHAT 102/202 do (#383).  Comfort and eco carry no temperature.
         """
         state = getattr(message, "zone_state", None)
+        zone_context = getattr(message, "zone_context", None) or ""
         if state in _ZONE_STATES_OFF or state in _ZONE_STATES_ON:
+            if zone_context == "heating":
+                self._season = SEASON_HEATING
+                self._season_reported = True
+            elif zone_context == "cooling":
+                self._season = SEASON_CONDITIONING
+                self._season_reported = True
             # Dimension 7 state 2 is antifreeze in the heating context and thermal protection
             # in the cooling one (the zone also reports *4*102*Z## / *4*202*Z##); comfort, eco,
             # and manual align with *4*107/108/207/208/110/210*Z## so whichever frame arrives
@@ -3989,7 +4000,7 @@ class MyHOMEClimate(MyHOMEEntity, ClimateEntity):
                     "cooling": "thermal_protection",
                     "generic": "protection",
                     "automatic": "protection",
-                }.get(getattr(message, "zone_context", None) or "")
+                }.get(zone_context)
             elif state in ("comfort", "eco", "manual"):
                 self._zone_operation = state
             else:
@@ -4008,7 +4019,6 @@ class MyHOMEClimate(MyHOMEEntity, ClimateEntity):
         if state not in _ZONE_STATES_ON:
             return
         prev_mode = self._attr_hvac_mode
-        zone_context = getattr(message, "zone_context", None) or ""
         mode = _ZONE_CONTEXT_MODES.get(zone_context)
         if (
             mode == HVACMode.COOL
@@ -5318,16 +5328,25 @@ class MyHOMEClimate(MyHOMEEntity, ClimateEntity):
                 if dimension == 20:
                     # The actuator report revealed a fan coil; ask which side it is on.
                     self._ask_fan_coil_sides()
+            mixed_season_pending_poll = (
+                self._season is None
+                and self._gateway_supports_zone_status
+                and not self._zone_status_request_sent
+                and False in self._fan_coil_sides.values()
+            )
             if (
                 (sides_resolved or (fan_enabled_now and self._fan_coil_sides))
                 and self._fan
                 and self._season_has_fan_coil()
+                and not mixed_season_pending_poll
             ):
                 # The entity is not polled after add (``should_poll`` is False) and the poll on
                 # add skipped ``*#4*Z*11##`` while the side was unknown or pending, or the fan
                 # coil showed up (dimension 20) once the side was already known: ask for the
                 # configured speed now, or ``fan_mode`` keeps the synthetic ``auto`` (dimension 20
-                # value 5, fan off, carries no speed).
+                # value 5, fan off, carries no speed). When a mixed valve/fan-coil zone still awaits
+                # its initial ``*#4*Z##`` status poll (season unknown), defer DIM 11 until that poll
+                # reveals the season so valve-season zones do not emit a 2.1 s NACKed ``*#4*Z*11##``.
                 self._request_zone_dimension(11)
             # Single-side empty Dimension 19 where the populated side is off (is_active is None):
             # skip only the actuator / hvac_action mutations while still falling through to
