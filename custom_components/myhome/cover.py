@@ -763,6 +763,7 @@ class MyHOMECover(MyHOMEEntity, CoverEntity):
         self._last_stop_at: float | None = None
         self._live_position_seen: bool = False
         self._tilt_assumed_from_end: bool = False
+        self._restored_tilt_level: int | None = None
         # Set once a real curtain run or slat pulse finishes (never by a static
         # *2*0*WHERE## poll reply while idle, nor by an aborted write).
         self._ran_since_start: bool = False
@@ -2018,14 +2019,40 @@ class MyHOMECover(MyHOMEEntity, CoverEntity):
         last_tilt = last_state.attributes.get(ATTR_CURRENT_TILT_POSITION)
         if last_tilt is None and saved_unavailable:
             last_tilt = record.get("tilt")
-        if last_tilt is not None:
-            try:
-                self._attr_current_cover_tilt_position = max(
-                    0, min(100, int(round(float(last_tilt))))
+        if last_tilt is None:
+            return
+        try:
+            restored_tilt = max(0, min(100, int(round(float(last_tilt)))))
+        except (ValueError, TypeError):
+            return
+        restored_level: int | None = None
+        if self._advanced:
+            raw_level = (
+                record.get("tilt_level")
+                if saved_unavailable
+                else last_state.attributes.get(ATTR_CURRENT_POSITION)
+            )
+            if raw_level is None:
+                raw_level = record.get("tilt_level")
+            if raw_level is not None:
+                try:
+                    restored_level = max(0, min(100, int(round(float(raw_level)))))
+                except (ValueError, TypeError):
+                    pass
+        self._attr_current_cover_tilt_position = restored_tilt
+        self._tilt_assumed_from_end = False
+        if self._advanced and restored_level is not None:
+            if self._attr_current_cover_position is None:
+                self._restored_tilt_level = restored_level
+            elif self._attr_current_cover_position != restored_level:
+                # A stopped Dim 10 frame arrived before restore and already shows a
+                # different height than before restart: slats moved with the curtain.
+                self._turn_slats_for_run(
+                    time.monotonic(),
+                    None,
+                    self._attr_current_cover_position > restored_level,
+                    self._attr_current_cover_position < restored_level,
                 )
-                self._tilt_assumed_from_end = False
-            except (ValueError, TypeError):
-                pass
 
     async def async_restore_last_state(self, last_state: Any) -> None:
         """Restore cover position and closure state."""
@@ -2198,6 +2225,8 @@ class MyHOMECover(MyHOMEEntity, CoverEntity):
             # WHO=2 Dimension 10 reports curtain height only, never slat angle; persist
             # slat tilt for both timed and advanced (Dim 10) Venetian blinds.
             data["tilt"] = tilt
+            if self._advanced and (level := self.current_cover_position) is not None:
+                data["tilt_level"] = level
         if self._last_run:
             data["last_run"] = dict(self._last_run)
         if self._actuator_locked is not None and self.scope is None:
@@ -4562,12 +4591,16 @@ class MyHOMECover(MyHOMEEntity, CoverEntity):
             # decides, and the level is only the last known position.
             if self._advanced:
                 self._attr_current_cover_position = position
+                self._restored_tilt_level = None
             position = None
         if position is None and self._handle_echo(message, now):
             self._publish_state()
             return
         if position is not None:
             previous_position = self._attr_current_cover_position
+            if previous_position is None and self._restored_tilt_level is not None:
+                previous_position = self._restored_tilt_level
+            self._restored_tilt_level = None
             if self._is_tilting:
                 level_changed = previous_position is not None and position != previous_position
                 # A blind that follows a scope cover's pulse is stopped by the scope's stop frame.
