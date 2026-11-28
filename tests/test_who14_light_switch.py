@@ -3063,10 +3063,11 @@ def test_group2b_who14_delegated_who1_and_2_and_f455_standby_failover(
         },
     )
     primary_f461._available = False
-    primary_f461._is_connected = False
+    primary_f461.is_connected = False
     standby_f455._available = True
-    standby_f455._is_connected = True
+    standby_f455.is_connected = True
     assert primary_f461.is_who_available(14) is False
+    assert primary_f461._failover_target(OWNCommand("*1*1*05##")) is standby_f455
     assert primary_f461._failover_target(OWNCommand("*14*0*05##")) is None
 
     # Direct WHO=14 delegation: F461 primary delegating WHO 14 to an F455 secondary returns False
@@ -3184,7 +3185,7 @@ async def test_who14_audit_button_availability_and_multi_gw_delegation(
     # 1. Online F455 itself reports is_who_available(14) == False
     _ef455, gw_f455 = _make_gateway(hass, model="F455", mac="00:03:50:cc:00:01")
     gw_f455._available = True
-    gw_f455._is_connected = True
+    gw_f455.is_connected = True
     assert gw_f455.is_who_available(14) is False
 
     # 2. F461 primary offline + F455 standby online -> Lock/Unlock buttons become unavailable!
@@ -3207,9 +3208,9 @@ async def test_who14_audit_button_availability_and_multi_gw_delegation(
         },
     )
     pri_f461._available = True
-    pri_f461._is_connected = True
+    pri_f461.is_connected = True
     stb_f455._available = True
-    stb_f455._is_connected = True
+    stb_f455.is_connected = True
     dis_btn = DisableCommandButtonEntity(
         hass=hass,
         platform="button",
@@ -3238,7 +3239,7 @@ async def test_who14_audit_button_availability_and_multi_gw_delegation(
     assert en_btn.available is True
 
     pri_f461._available = False
-    pri_f461._is_connected = False
+    pri_f461.is_connected = False
     assert pri_f461.is_who_available(1) is True
     assert dis_btn.available is False
     assert en_btn.available is False
@@ -3632,6 +3633,148 @@ async def test_who14_audit_plain_inflight_poll_switch_peer_sweep_and_impulse_cov
     # Live non-poll impulse event DOES self-heal lock
     imp.handle_event(OWNEvent.parse("*1*1*09##"))
     assert imp.actuator_locked is False
+
+
+async def test_supports_who14_commands_with_pending_secondary_precedence(
+    hass: HomeAssistant,
+) -> None:
+    """``supports_who14_commands`` honours pending (unloaded) secondaries with the same precedence as ``_who14_secondary``."""
+    from custom_components.myhome.topology import (
+        CONF_BUS_TOPOLOGY,
+        CONF_DELEGATED_WHOS,
+        CONF_GATEWAY_ROLE,
+        CONF_PRIMARY_GATEWAY,
+        ROLE_PRIMARY,
+        ROLE_SECONDARY,
+        TOPOLOGY_SHARED,
+    )
+
+    def _add_pending_secondary(
+        *,
+        model: str,
+        mac: str,
+        primary_mac: str,
+        delegated: list[int],
+    ) -> MockConfigEntry:
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            data={
+                CONF_HOST: "192.0.2.99",
+                CONF_PORT: 20000,
+                CONF_PASSWORD: "secret",
+                CONF_MAC: mac,
+                CONF_NAME: model,
+            },
+            options={
+                CONF_BUS_TOPOLOGY: TOPOLOGY_SHARED,
+                CONF_GATEWAY_ROLE: ROLE_SECONDARY,
+                CONF_PRIMARY_GATEWAY: primary_mac,
+                CONF_DELEGATED_WHOS: delegated,
+            },
+            unique_id=mac,
+        )
+        entry.add_to_hass(hass)
+        return entry
+
+    # 1. F455 primary + pending F461 secondary delegating [1, 2] -> True before secondary loads
+    mac_p1 = "00:03:50:dd:01:01"
+    _ep1, pri1 = _make_gateway(
+        hass,
+        model="F455",
+        mac=mac_p1,
+        options={CONF_BUS_TOPOLOGY: TOPOLOGY_SHARED, CONF_GATEWAY_ROLE: ROLE_PRIMARY},
+    )
+    _add_pending_secondary(model="F461", mac="00:03:50:dd:01:02", primary_mac=mac_p1, delegated=[1, 2])
+    assert pri1.supports_who14_commands is True
+
+    # 2. F455 primary + pending F455 secondary delegating [1, 2] -> False
+    mac_p2 = "00:03:50:dd:02:01"
+    _ep2, pri2 = _make_gateway(
+        hass,
+        model="F455",
+        mac=mac_p2,
+        options={CONF_BUS_TOPOLOGY: TOPOLOGY_SHARED, CONF_GATEWAY_ROLE: ROLE_PRIMARY},
+    )
+    _add_pending_secondary(model="F455", mac="00:03:50:dd:02:02", primary_mac=mac_p2, delegated=[1, 2])
+    assert pri2.supports_who14_commands is False
+
+    # 3. Explicit WHO=14 pending F455 beats loaded [1, 2] F461 -> False
+    mac_p3 = "00:03:50:dd:03:01"
+    _ep3, pri3 = _make_gateway(
+        hass,
+        model="F455",
+        mac=mac_p3,
+        options={CONF_BUS_TOPOLOGY: TOPOLOGY_SHARED, CONF_GATEWAY_ROLE: ROLE_PRIMARY},
+    )
+    _make_gateway(
+        hass,
+        model="F461",
+        mac="00:03:50:dd:03:02",
+        options={
+            CONF_BUS_TOPOLOGY: TOPOLOGY_SHARED,
+            CONF_GATEWAY_ROLE: ROLE_SECONDARY,
+            CONF_PRIMARY_GATEWAY: mac_p3,
+            CONF_DELEGATED_WHOS: [1, 2],
+        },
+    )
+    _add_pending_secondary(model="F455", mac="00:03:50:dd:03:03", primary_mac=mac_p3, delegated=[14])
+    assert pri3.supports_who14_commands is False
+
+    # 4. Explicit WHO=14 pending F461 beats loaded [1, 2] F455 -> True
+    mac_p4 = "00:03:50:dd:04:01"
+    _ep4, pri4 = _make_gateway(
+        hass,
+        model="F455",
+        mac=mac_p4,
+        options={CONF_BUS_TOPOLOGY: TOPOLOGY_SHARED, CONF_GATEWAY_ROLE: ROLE_PRIMARY},
+    )
+    _make_gateway(
+        hass,
+        model="F455",
+        mac="00:03:50:dd:04:02",
+        options={
+            CONF_BUS_TOPOLOGY: TOPOLOGY_SHARED,
+            CONF_GATEWAY_ROLE: ROLE_SECONDARY,
+            CONF_PRIMARY_GATEWAY: mac_p4,
+            CONF_DELEGATED_WHOS: [1, 2],
+        },
+    )
+    _add_pending_secondary(model="F461", mac="00:03:50:dd:04:03", primary_mac=mac_p4, delegated=[14])
+    assert pri4.supports_who14_commands is True
+
+    # 5. Split [1] loaded F455 + [2] pending F461 -> True (matches loaded preference for WHO 14-capable peer)
+    mac_p5 = "00:03:50:dd:05:01"
+    _ep5, pri5 = _make_gateway(
+        hass,
+        model="F455",
+        mac=mac_p5,
+        options={CONF_BUS_TOPOLOGY: TOPOLOGY_SHARED, CONF_GATEWAY_ROLE: ROLE_PRIMARY},
+    )
+    _make_gateway(
+        hass,
+        model="F455",
+        mac="00:03:50:dd:05:02",
+        options={
+            CONF_BUS_TOPOLOGY: TOPOLOGY_SHARED,
+            CONF_GATEWAY_ROLE: ROLE_SECONDARY,
+            CONF_PRIMARY_GATEWAY: mac_p5,
+            CONF_DELEGATED_WHOS: [1],
+        },
+    )
+    _add_pending_secondary(model="F461", mac="00:03:50:dd:05:03", primary_mac=mac_p5, delegated=[2])
+    assert pri5.supports_who14_commands is True
+
+    # 6. Partial delegation ([1] only on F455 primary) does not delegate WHO 14 -> False
+    mac_p6 = "00:03:50:dd:06:01"
+    _ep6, pri6 = _make_gateway(
+        hass,
+        model="F455",
+        mac=mac_p6,
+        options={CONF_BUS_TOPOLOGY: TOPOLOGY_SHARED, CONF_GATEWAY_ROLE: ROLE_PRIMARY},
+    )
+    _add_pending_secondary(model="F461", mac="00:03:50:dd:06:02", primary_mac=mac_p6, delegated=[1])
+    assert pri6.supports_who14_commands is False
+
 
 
 

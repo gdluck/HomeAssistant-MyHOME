@@ -84,6 +84,9 @@ from .topology import (
     DOOR_ENTRY_WHO6_ONLY_MODELS,
     DOOR_ENTRY_WHO8_ONLY_MODELS,
     GatewayTopologyMixin,
+    dependents,
+    entry_delegated_whos,
+    entry_model,
     peer_handles_who,
 )
 
@@ -1153,8 +1156,35 @@ class MyHOMEGatewayHandler(GatewayTopologyMixin, GatewayIdentityMixin):
     def supports_who14_commands(self) -> bool:
         """Whether this gateway (or its WHO=14 / WHO=1/2 secondary) accepts outbound WHO=14 lock/unlock commands."""
         sec = self._who14_secondary()
+        if sec is not None and sec.supports_who14_commands:
+            return True
+        if not self.is_follower and getattr(self, "hass", None) is not None:
+            delegated = self.delegated_away_whos
+            if 14 in delegated:
+                if sec is not None:
+                    return False
+                for dep in dependents(self.hass, self.mac):
+                    if 14 in entry_delegated_whos(dep) and getattr(
+                        getattr(dep, "runtime_data", None), "gateway", None
+                    ) is None:
+                        return _resolve_model_key(entry_model(dep)) not in WHO14_COMMANDS_REFUSED
+            elif (
+                not (self._profile_supports_who(1) or self._profile_supports_who(2))
+                or {1, 2}.issubset(delegated)
+            ):
+                found_pending = False
+                for dep in dependents(self.hass, self.mac):
+                    if getattr(getattr(dep, "runtime_data", None), "gateway", None) is not None:
+                        continue
+                    dep_whos = entry_delegated_whos(dep)
+                    if 1 in dep_whos or 2 in dep_whos:
+                        found_pending = True
+                        if _resolve_model_key(entry_model(dep)) not in WHO14_COMMANDS_REFUSED:
+                            return True
+                if sec is not None or found_pending:
+                    return False
         if sec is not None:
-            return sec.supports_who14_commands
+            return False
         return self._own_supports_who14_commands
 
     @property
